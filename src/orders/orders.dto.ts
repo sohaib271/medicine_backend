@@ -8,6 +8,8 @@ import {
   IsMongoId,
   IsNumber,
   IsOptional,
+  IsString,
+  MaxLength,
   IsUUID,
   Max,
   Min,
@@ -25,6 +27,7 @@ export class OrderItemDto {
   discountValue?: number;
 }
 export class CreateOrderDto {
+  @IsOptional() @IsString() @MaxLength(500) remarks?: string;
   @IsOptional()
   @ValidateNested()
   @Type(() => CustomerDto)
@@ -47,6 +50,7 @@ export class CreateOrderDto {
   receivedAmount: number;
 }
 export class UpdateOrderDto {
+  @IsOptional() @IsString() @MaxLength(500) remarks?: string;
   @IsOptional()
   @ValidateNested()
   @Type(() => CustomerDto)

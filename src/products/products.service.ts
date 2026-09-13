@@ -39,6 +39,7 @@ export class ProductsService {
       name: dto.name.trim(),
       type: dto.type,
       strength: dto.strength.trim(),
+      ...(dto.company !== undefined ? { company: dto.company.trim() } : {}),
       purchasePriceCents: cents(dto.purchasePrice),
       salePriceCents,
       discountType: dto.discountType,

@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import type { Customer, Order, Product } from '../database/schemas';
 import { ListQuery, pageResult, searchRegex } from '../common/dto';
 import { cents, discountedPrice, paymentStatus } from '../common/money';
+import { receivedProfit } from './profit';
 import {
   CreateOrderDto,
   OrderItemDto,
@@ -42,21 +43,68 @@ export class OrdersService {
     const [data, total] = await Promise.all([
       this.orders
         .find(filter)
-        .select('-items -statusHistory -requestId')
+        .select('-statusHistory -requestId')
         .sort({ createdAt: -1, _id: -1 })
         .skip((query.page - 1) * query.limit)
         .limit(query.limit)
         .lean(),
       this.orders.countDocuments(filter),
     ]);
-    return pageResult(data, total, query);
+    const enriched = await this.withProfit(data);
+    return pageResult(
+      enriched.map(({ items, ...summary }) => {
+        void items;
+        return summary;
+      }),
+      total,
+      query,
+    );
   }
   async get(id: string) {
     const order = await this.orders
       .findOne({ _id: id, deletedAt: null })
       .lean();
     if (!order) throw new NotFoundException('Order not found.');
-    return order;
+    return (await this.withProfit([order]))[0];
+  }
+  private async withProfit<
+    T extends { items: Order['items']; receivedCents: number },
+  >(orders: T[]) {
+    const missingIds = [
+      ...new Set(
+        orders.flatMap((order) =>
+          order.items
+            .filter((item) => item.purchasePriceCents == null)
+            .map((item) => item.productId.toString()),
+        ),
+      ),
+    ];
+    const products = missingIds.length
+      ? await this.products
+          .find({ _id: { $in: missingIds } })
+          .select('purchasePriceCents')
+          .lean()
+      : [];
+    const costs = new Map(
+      products.map((product) => [
+        product._id.toString(),
+        product.purchasePriceCents,
+      ]),
+    );
+    return orders.map((order) => ({
+      ...order,
+      profitEstimated: order.items.some(
+        (item) => item.purchasePriceCents == null,
+      ),
+      profitCents: receivedProfit(
+        order.receivedCents,
+        order.items.map((item) => ({
+          quantity: item.quantity,
+          purchasePriceCents:
+            item.purchasePriceCents ?? costs.get(item.productId.toString()),
+        })),
+      ),
+    }));
   }
   // All product reads are batched. Writes use conditional stock checks inside the same transaction.
   private async prepareItems(
@@ -94,8 +142,12 @@ export class OrdersService {
         name: old?.name ?? product.name,
         type: old?.type ?? product.type,
         strength: old?.strength ?? product.strength,
+        company: old ? old.company : product.company,
         quantity: item.quantity,
         unitPriceCents,
+        purchasePriceCents: old
+          ? old.purchasePriceCents
+          : product.purchasePriceCents,
         discountType,
         discountValue,
         netUnitPriceCents,
@@ -104,7 +156,12 @@ export class OrdersService {
     });
   }
   private totals(
-    items: { unitPriceCents: number; quantity: number; totalCents: number }[],
+    items: {
+      unitPriceCents: number;
+      quantity: number;
+      totalCents: number;
+      purchasePriceCents?: number | null;
+    }[],
     receivedAmount: number,
     previousPendingCents: number,
   ) {
@@ -119,6 +176,7 @@ export class OrdersService {
     const status = paymentStatus(totalCents, receivedCents);
     return {
       subtotalCents,
+      profitCents: receivedProfit(receivedCents, items),
       totalCents,
       discountCents: subtotalCents - totalCents,
       receivedCents,
@@ -221,6 +279,7 @@ export class OrdersService {
               customerName: billing.name.trim(),
               customerAddress: billing.address,
               customerPhone: billing.phone,
+              remarks: dto.remarks?.trim() ?? '',
               items,
               ...totals,
               statusUpdatedAt: now,
@@ -282,6 +341,8 @@ export class OrdersService {
         });
       }
       order.set({ ...totals, items, version: order.version + 1 });
+      if ('remarks' in dto && dto.remarks !== undefined)
+        order.set({ remarks: dto.remarks.trim() });
       if ('billingDetails' in dto && dto.billingDetails) {
         if (!dto.billingDetails.name.trim())
           throw new BadRequestException('Billing name is required.');

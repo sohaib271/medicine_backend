@@ -14,6 +14,8 @@ interface RecordResult {
   _id: string;
   version: number;
   totalCents: number;
+  profitCents: number | null;
+  profitEstimated: boolean;
   previousPendingCents: number;
   grandTotalCents: number;
   receivedCents: number;
@@ -122,6 +124,63 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     return (res.body as { data: RecordResult[] }).data[0].stock;
   };
 
+  it('preserves purchase cost snapshots and labels legacy profit estimates', async () => {
+    const p = await product();
+    const c = await customer();
+    const order = read(
+      await create({
+        customerId: c._id,
+        items: [{ productId: p._id, quantity: 2 }],
+      }).expect(201),
+    );
+    expect(order.profitCents).toBe(-12000);
+    await db.models.Product.updateOne(
+      { _id: p._id },
+      { $set: { purchasePriceCents: 8000 } },
+    );
+    const updated = read(
+      await request(app.getHttpServer())
+        .put(`/api/orders/${order._id}`)
+        .set(origin)
+        .set('Cookie', cookie)
+        .send({
+          version: 0,
+          items: [{ productId: p._id, quantity: 3 }],
+          receivedAmount: 0,
+        })
+        .expect(200),
+    );
+    expect(updated.profitCents).toBe(-18000);
+    const paid = read(
+      await request(app.getHttpServer())
+        .patch(`/api/orders/${order._id}/payment`)
+        .set(origin)
+        .set('Cookie', cookie)
+        .send({ version: 1, receivedAmount: 210 })
+        .expect(200),
+    );
+    expect(paid.profitCents).toBe(3000);
+    const list = await request(app.getHttpServer())
+      .get('/api/orders')
+      .set('Cookie', cookie)
+      .expect(200);
+    const saved = (list.body as { data: RecordResult[] }).data[0];
+    expect(saved.profitCents).toBe(3000);
+    expect(saved.profitEstimated).toBe(false);
+    // Simulate an invoice created before purchase costs were saved.
+    await db.models.Order.updateOne(
+      { _id: order._id },
+      { $unset: { 'items.$[].purchasePriceCents': '', profitCents: '' } },
+    );
+    const legacy = read(
+      await request(app.getHttpServer())
+        .get(`/api/orders/${order._id}`)
+        .set('Cookie', cookie)
+        .expect(200),
+    );
+    expect(legacy.profitCents).toBe(-3000);
+    expect(legacy.profitEstimated).toBe(true);
+  });
   it('protects API routes and blocks cross-origin mutations', async () => {
     await request(app.getHttpServer()).get('/api/products').expect(401);
     await request(app.getHttpServer())

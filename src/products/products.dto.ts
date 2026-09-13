@@ -2,6 +2,7 @@ import {
   IsIn,
   IsInt,
   IsNumber,
+  IsOptional,
   IsString,
   Max,
   MaxLength,
@@ -10,6 +11,7 @@ import {
 } from 'class-validator';
 import { medicineTypes } from '../database/schemas';
 export class ProductDto {
+  @IsOptional() @IsString() @MaxLength(100) company?: string;
   @IsString() @MinLength(1) @MaxLength(150) name: string;
   @IsIn(medicineTypes) type: (typeof medicineTypes)[number];
   @IsString() @MaxLength(60) strength: string;
