@@ -29,7 +29,9 @@ export class AuthController {
   private cookieOptions(): CookieOptions {
     return {
       httpOnly: true,
-      secure: this.config.get('NODE_ENV') === 'production',
+      secure:
+        this.config.get('NODE_ENV') === 'production' &&
+        process.env.LOCAL_DESKTOP !== 'true',
       sameSite: 'lax',
       path: '/api',
     };

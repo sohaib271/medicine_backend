@@ -9,7 +9,18 @@ export function configureApp(app: INestApplication) {
     .get(ConfigService)
     .get<string>('FRONTEND_URL', 'http://127.0.0.1:5173');
   app.setGlobalPrefix('api');
-  app.use(helmet());
+  app.use(
+    helmet(
+      process.env.LOCAL_DESKTOP === 'true'
+        ? {
+            contentSecurityPolicy: {
+              directives: { upgradeInsecureRequests: null },
+            },
+            strictTransportSecurity: false,
+          }
+        : {},
+    ),
+  );
   app.use(cookieParser());
   app.enableCors({ origin, credentials: true });
   // A non-simple header forces cross-origin browsers to preflight every mutation.
