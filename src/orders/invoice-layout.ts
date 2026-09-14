@@ -160,7 +160,8 @@ export function renderInvoice(
   const pageNumberY = metaY;
   metaY += 18;
   y = Math.max(customerY, metaY) + 8;
-  const remarks = `REMARKS: ${order.remarks?.trim() || '-'}`;
+  const savedRemarks = order.remarks?.trim();
+  const remarks = `REMARKS: ${order.customerName}${savedRemarks ? ` — ${savedRemarks}` : ''}`;
   text(remarks, left, y, width, 8, false, color.muted);
   y += height(remarks, width, 8) + 10;
   const cols = [24, 130, 65, 48, 30, 57, 39, 52, width - 445];
