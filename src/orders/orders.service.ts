@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model, Types } from 'mongoose';
-import { randomUUID } from 'crypto';
+import { DocumentNumberService } from '../database/document-number.service';
 import type { Customer, Order, Product } from '../database/schemas';
 import { ListQuery, pageResult, searchRegex } from '../common/dto';
 import { cents, discountedPrice, paymentStatus } from '../common/money';
@@ -21,6 +21,7 @@ import {
 @Injectable()
 export class OrdersService {
   constructor(
+    private numbers: DocumentNumberService,
     @InjectConnection() private connection: Connection,
     @InjectModel('Order') private orders: Model<Order>,
     @InjectModel('Product') private products: Model<Product>,
@@ -236,6 +237,10 @@ export class OrdersService {
         );
       return existing;
     }
+    const invoiceNumber = await this.numbers.next(
+      'ZT',
+      this.orders.collection.collectionName,
+    );
     try {
       return await this.connection.transaction(async (session) => {
         let customer = dto.customerId
@@ -274,7 +279,7 @@ export class OrdersService {
           [
             {
               requestId: dto.requestId,
-              invoiceNumber: `ZT-${now.toISOString().slice(0, 10).replaceAll('-', '')}-${randomUUID().slice(0, 8).toUpperCase()}`,
+              invoiceNumber,
               customerId: customer._id,
               customerName: billing.name.trim(),
               customerAddress: billing.address,

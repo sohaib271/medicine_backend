@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/common/setup';
 import { permissions } from '../src/database/schemas';
+import { DocumentNumberService } from '../src/database/document-number.service';
 
 interface RecordResult {
   _id: string;
@@ -64,12 +65,103 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     expect(cookie).toContain('SameSite=Lax');
   });
   beforeEach(async () => {
+    await db.models.DeliveryChallan.deleteMany({});
     await db.models.Order.deleteMany({});
     await db.models.Product.deleteMany({});
     await db.models.Customer.deleteMany({});
   });
   afterAll(async () => {
     await app?.close();
+  });
+  it('allocates unique sequential numbers concurrently and does not reuse deleted numbers', async () => {
+    await db.collection('document_counters').deleteMany({});
+    await db.models.DeliveryChallan.create({
+      challanNumber: 'DC-23',
+      requestId: randomUUID(),
+      items: [],
+      status: 'pending',
+      statusUpdatedAt: new Date(),
+    });
+    const numbers = app.get(DocumentNumberService);
+    const issued = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        numbers.next('DC', db.models.DeliveryChallan.collection.collectionName),
+      ),
+    );
+    expect(new Set(issued).size).toBe(8);
+    expect(
+      issued.map((value) => Number(value.slice(3))).sort((a, b) => a - b),
+    ).toEqual([24, 25, 26, 27, 28, 29, 30, 31]);
+    await db.models.DeliveryChallan.deleteMany({});
+    expect(
+      await numbers.next(
+        'DC',
+        db.models.DeliveryChallan.collection.collectionName,
+      ),
+    ).toBe('DC-32');
+  });
+  it('creates, edits and downloads non-billing delivery challans without changing stock', async () => {
+    const medicine = await product(10);
+    const payload = {
+      requestId: randomUUID(),
+      status: 'pending',
+      items: [
+        {
+          name: 'Panadol',
+          company: 'Sample Pharma',
+          type: 'Tablet',
+          quantity: 3,
+        },
+      ],
+    };
+    await request(app.getHttpServer()).get('/api/challans').expect(401);
+    const created = await request(app.getHttpServer())
+      .post('/api/challans')
+      .set(origin)
+      .set('Cookie', cookie)
+      .send(payload)
+      .expect(201);
+    const id = read(created)._id;
+    const retry = await request(app.getHttpServer())
+      .post('/api/challans')
+      .set(origin)
+      .set('Cookie', cookie)
+      .send(payload)
+      .expect(201);
+    expect(read(retry)._id).toBe(id);
+    await request(app.getHttpServer())
+      .put(`/api/challans/${id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ items: payload.items, status: 'delivered', version: 0 })
+      .expect(200)
+      .expect((res) => {
+        expect(read(res).status).toBe('delivered');
+        expect(read(res).version).toBe(1);
+      });
+    await request(app.getHttpServer())
+      .put(`/api/challans/${id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ items: payload.items, status: 'pending', version: 0 })
+      .expect(409);
+    await request(app.getHttpServer())
+      .get(`/api/challans/${id}/pdf`)
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect('Content-Type', /pdf/);
+    await request(app.getHttpServer())
+      .post('/api/challans')
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ ...payload, requestId: randomUUID(), amount: 100 })
+      .expect(400);
+    const storedProduct = (await db.models.Product.findById(
+      medicine._id,
+    ).lean()) as { stock: number } | null;
+    expect(storedProduct?.stock).toBe(10);
+    expect(await db.models.Order.countDocuments()).toBe(0);
+    expect(await db.models.DeliveryChallan.countDocuments()).toBe(1);
   });
   const product = async (stock = 10) =>
     read(

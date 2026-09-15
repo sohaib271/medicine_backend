@@ -12,6 +12,7 @@ import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { InvoiceService } from './orders/invoice.service';
 import { DashboardController } from './dashboard/dashboard.controller';
+import { ChallansModule } from './challans/challans.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -37,6 +38,7 @@ import { DashboardController } from './dashboard/dashboard.controller';
     DatabaseModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 180 }]),
     AuthModule,
+    ChallansModule,
   ],
   controllers: [
     ProductsController,

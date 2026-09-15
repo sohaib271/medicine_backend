@@ -137,10 +137,7 @@ export function renderInvoice(
   y += 13;
   text(order.customerName, left, y, 245, 10, true);
   let customerY = y + height(order.customerName, 245, 10, true) + 4;
-  for (const detail of [
-    `AREA: ${order.customerAddress || '-'}`,
-    order.customerPhone,
-  ]) {
+  for (const detail of [order.customerPhone]) {
     if (!detail) continue;
     text(detail, left, customerY, 245, 8, false, color.muted);
     customerY += height(detail, 245, 8) + 3;
@@ -162,12 +159,32 @@ export function renderInvoice(
   y = Math.max(customerY, metaY) + 8;
   const savedRemarks = order.remarks?.trim();
   const remarks = `REMARKS: ${order.customerName}${savedRemarks ? ` — ${savedRemarks}` : ''}`;
-  text(remarks, left, y, width, 8, false, color.muted);
-  y += height(remarks, width, 8) + 10;
+  const area = `AREA: ${order.customerAddress || '-'}`;
+  const remarksWidth = width - 266;
+  text(area, left, y, 245, 8, false, color.ink);
+  text(remarks, left + 266, y, remarksWidth, 8, true, color.ink);
+  y +=
+    Math.max(height(area, 245, 8), height(remarks, remarksWidth, 8, true)) + 10;
   const cols = [24, 130, 65, 48, 30, 57, 39, 52, width - 445];
   const positions = cols.map(
     (_, index) => left + cols.slice(0, index).reduce((sum, v) => sum + v, 0),
   );
+  const columnBorders = (top: number, rowHeight: number, headerRow = false) => {
+    doc
+      .save()
+      .lineWidth(0.5)
+      .strokeColor(headerRow ? '#6D8C7F' : color.line);
+    const boundaries = headerRow
+      ? positions.slice(1)
+      : [...positions, left + width];
+    for (const x of boundaries) {
+      doc
+        .moveTo(x, top)
+        .lineTo(x, top + rowHeight)
+        .stroke();
+    }
+    doc.restore();
+  };
   const tableHead = () => {
     text(
       `MEDICINES  /  ${settings.currency}`,
@@ -181,15 +198,15 @@ export function renderInvoice(
     y += 13;
     doc.roundedRect(left, y, width, 24, 4).fill(color.forest);
     [
-      'SR#',
-      'PRODUCTS',
-      'COMPANY',
-      'TYPE',
-      'QTY',
-      'RATE',
-      'DISC%',
-      'DISCOUNT',
-      'NET AMOUNT',
+      'Sr',
+      'Product',
+      'Company',
+      'Type',
+      'Qty',
+      'Rate',
+      'Disc %',
+      'Disc Unit',
+      'Net Amount',
     ].forEach((label, i) =>
       text(
         label,
@@ -202,6 +219,7 @@ export function renderInvoice(
         i > 3 ? 'right' : 'left',
       ),
     );
+    columnBorders(y, 24, true);
     y += 24;
   };
   const nextPage = (withTable: boolean) => {
@@ -247,6 +265,7 @@ export function renderInvoice(
         i > 3 ? 'right' : 'left',
       ),
     );
+    columnBorders(y, rowHeight);
     y += rowHeight;
     rule(y);
   });

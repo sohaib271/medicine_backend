@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { DocumentNumberService } from './document-number.service';
 import {
   CustomerSchema,
   OrderSchema,
@@ -10,6 +11,7 @@ import {
 
 @Global()
 @Module({
+  providers: [DocumentNumberService],
   imports: [
     MongooseModule.forFeature([
       { name: 'User', schema: UserSchema },
@@ -19,6 +21,6 @@ import {
       { name: 'Order', schema: OrderSchema },
     ]),
   ],
-  exports: [MongooseModule],
+  exports: [MongooseModule, DocumentNumberService],
 })
 export class DatabaseModule {}

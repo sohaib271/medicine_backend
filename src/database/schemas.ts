@@ -19,6 +19,8 @@ export const permissions = [
   'orders:read',
   'orders:write',
   'dashboard:read',
+  'challans:read',
+  'challans:write',
 ] as const;
 
 export const RoleSchema = new Schema(
