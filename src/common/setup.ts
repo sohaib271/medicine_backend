@@ -5,13 +5,15 @@ import helmet from 'helmet';
 import type { Request, Response, NextFunction } from 'express';
 
 export function configureApp(app: INestApplication) {
-  const origin = app
-    .get(ConfigService)
-    .get<string>('FRONTEND_URL', 'http://127.0.0.1:5173');
+  const config = app.get(ConfigService);
+  const localDesktop = process.env.LOCAL_DESKTOP === 'true';
+  const origin = localDesktop
+    ? `http://127.0.0.1:${config.get<number>('PORT', 3000)}`
+    : config.get<string>('FRONTEND_URL', 'http://127.0.0.1:5173');
   app.setGlobalPrefix('api');
   app.use(
     helmet(
-      process.env.LOCAL_DESKTOP === 'true'
+      localDesktop
         ? {
             contentSecurityPolicy: {
               directives: { upgradeInsecureRequests: null },

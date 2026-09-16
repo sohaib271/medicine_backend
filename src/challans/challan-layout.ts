@@ -97,9 +97,12 @@ export function renderChallan(
   text('Created', left + 285, 90, 55, 8, true, muted);
   text(date(challan.createdAt), left + 340, 90, width - 340);
   const cols = [28, 191, 100, width - 459, 140];
-  const xs = cols.map(
-    (_, i) => left + cols.slice(0, i).reduce((sum, w) => sum + w, 0),
-  );
+  let position = left;
+  const xs = cols.map((columnWidth) => {
+    const current = position;
+    position += columnWidth;
+    return current;
+  });
   text('CUSTOMER', left, 109, 65, 8, true, muted);
   text(challan.customerName || '-', left + 67, 109, width - 67, 8, true);
   const detailsY =

@@ -120,13 +120,14 @@ export class OrdersService {
       .session(session)
       .lean();
     const byId = new Map(products.map((p) => [p._id.toString(), p]));
+    const previousById = new Map(
+      previous?.map((item) => [item.productId.toString(), item]) ?? [],
+    );
     return input.map((item) => {
       const product = byId.get(item.productId);
       if (!product)
         throw new BadRequestException('A selected medicine no longer exists.');
-      const old = previous?.find(
-        (i) => i.productId.toString() === item.productId,
-      );
+      const old = previousById.get(item.productId);
       // Preserve invoiced prices when editing existing lines; new lines use the current price.
       const unitPriceCents = old?.unitPriceCents ?? product.salePriceCents;
       const discountType =

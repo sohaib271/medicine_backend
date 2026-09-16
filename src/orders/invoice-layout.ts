@@ -166,9 +166,12 @@ export function renderInvoice(
   y +=
     Math.max(height(area, 245, 8), height(remarks, remarksWidth, 8, true)) + 10;
   const cols = [24, 130, 65, 48, 30, 57, 39, 52, width - 445];
-  const positions = cols.map(
-    (_, index) => left + cols.slice(0, index).reduce((sum, v) => sum + v, 0),
-  );
+  let position = left;
+  const positions = cols.map((columnWidth) => {
+    const current = position;
+    position += columnWidth;
+    return current;
+  });
   const columnBorders = (top: number, rowHeight: number, headerRow = false) => {
     doc
       .save()
