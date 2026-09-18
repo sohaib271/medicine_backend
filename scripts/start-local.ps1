@@ -1,7 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $backend = Split-Path -Parent $PSScriptRoot
-$node = 'C:\nvm4w\nodejs\node.exe'
-
+$node = 'C:\Program Files\nodejs\node.exe'
 Set-Location $backend
 $env:LOCAL_DESKTOP = 'true'
 $env:NODE_ENV = 'production'
