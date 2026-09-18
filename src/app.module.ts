@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { resolve } from 'node:path';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { ProductsController } from './products/products.controller';
@@ -17,9 +18,12 @@ import { ChallansModule } from './challans/challans.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: resolve(__dirname, '../.env'),
       validate: (env: Record<string, unknown>) => {
         if (typeof env.MONGODB_URL !== 'string' || !env.MONGODB_URL)
-          throw new Error('MONGODB_URL must be configured.');
+          throw new Error(
+            `MONGODB_URL must be configured in ${resolve(__dirname, '../.env')} or the process environment.`,
+          );
         if (typeof env.JWT_SECRET !== 'string' || env.JWT_SECRET.length < 32)
           throw new Error('JWT_SECRET must be at least 32 characters.');
         if (env.NODE_ENV === 'production' && !env.FRONTEND_URL)
