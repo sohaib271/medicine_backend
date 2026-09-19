@@ -110,7 +110,8 @@ describe('Medical store API with isolated MongoDB transactions', () => {
           name: 'Panadol',
           company: 'Sample Pharma',
           type: 'Tablet',
-          quantity: 3,
+          packs: 3,
+          piecesPerPack: 6,
         },
       ],
     };
@@ -122,6 +123,9 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       .send(payload)
       .expect(201);
     const id = read(created)._id;
+    expect(
+      (created.body as { items: { quantity: number }[] }).items[0].quantity,
+    ).toBe(18);
     const retry = await request(app.getHttpServer())
       .post('/api/challans')
       .set(origin)
@@ -215,6 +219,101 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       .expect(200);
     return (res.body as { data: RecordResult[] }).data[0].stock;
   };
+
+  it('deletes products, customers, and delivery challans from active lists', async () => {
+    const p = await product();
+    const c = await customer();
+    const challan = read(
+      await request(app.getHttpServer())
+        .post('/api/challans')
+        .set(origin)
+        .set('Cookie', cookie)
+        .send({
+          requestId: randomUUID(),
+          status: 'pending',
+          items: [
+            {
+              name: 'Panadol',
+              company: 'Sample',
+              type: 'Tablet',
+              packs: 1,
+              piecesPerPack: 10,
+            },
+          ],
+        })
+        .expect(201),
+    );
+    await request(app.getHttpServer())
+      .delete(`/api/products/${p._id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ version: p.version })
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/api/customers/${c._id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({})
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/api/challans/${challan._id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ version: challan.version })
+      .expect(200);
+    for (const path of ['products', 'customers', 'challans']) {
+      const result = await request(app.getHttpServer())
+        .get(`/api/${path}`)
+        .set('Cookie', cookie)
+        .expect(200);
+      expect((result.body as { total: number }).total).toBe(0);
+    }
+  });
+
+  it('calculates packed stock, supports pack alarms, and adds arrivals', async () => {
+    const created = read(
+      await request(app.getHttpServer())
+        .post('/api/products')
+        .set(origin)
+        .set('Cookie', cookie)
+        .send({
+          name: 'Packed medicine',
+          type: 'Tablet',
+          strength: '10 mg',
+          purchasePrice: 10,
+          salePrice: 15,
+          discountType: 'percent',
+          discountValue: 0,
+          packing: 20,
+          quantityPerPacking: 6,
+          alarmType: 'packing',
+          alarmLimit: 30,
+        })
+        .expect(201),
+    );
+    expect(created.stock).toBe(120);
+    const lowStock = await request(app.getHttpServer())
+      .get('/api/products?lowStock=true')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect((lowStock.body as { total: number }).total).toBe(1);
+    const updated = read(
+      await request(app.getHttpServer())
+        .patch(`/api/products/${created._id}/inventory`)
+        .set(origin)
+        .set('Cookie', cookie)
+        .send({ packing: 5, quantityPerPacking: 8, version: created.version })
+        .expect(200),
+    );
+    expect(updated.stock).toBe(160);
+    expect(updated.version).toBe(1);
+    const c = await customer();
+    await create({
+      customerId: c._id,
+      items: [{ productId: created._id, quantity: 2 }],
+    }).expect(201);
+    expect(await stock()).toBe(144);
+  });
 
   it('preserves purchase cost snapshots and labels legacy profit estimates', async () => {
     const p = await product();

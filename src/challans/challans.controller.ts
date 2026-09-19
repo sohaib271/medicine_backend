@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -13,6 +14,7 @@ import PDFDocument from 'pdfkit';
 import type { Response } from 'express';
 import { Permit } from '../auth/auth.guard';
 import { IdPipe } from '../common/id.pipe';
+import { VersionDto } from '../common/dto';
 import { ChallansService } from './challans.service';
 import {
   ChallanQuery,
@@ -40,6 +42,12 @@ export class ChallansController {
     @Body() dto: UpdateChallanDto,
   ) {
     return this.service.update(id, dto);
+  }
+  @Delete(':id') @Permit('challans:write') remove(
+    @Param('id', IdPipe) id: string,
+    @Body() dto: VersionDto,
+  ) {
+    return this.service.remove(id, dto.version);
   }
   @Get(':id/pdf') @Permit('challans:read') async pdf(
     @Param('id', IdPipe) id: string,

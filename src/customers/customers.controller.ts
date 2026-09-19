@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -20,14 +22,17 @@ import { CustomerDto } from './customers.dto';
 export class CustomersController {
   constructor(@InjectModel('Customer') private customers: Model<Customer>) {}
   @Get() @Permit('customers:read') async list(@Query() query: ListQuery) {
-    const filter = query.search
-      ? {
-          $or: [
-            { name: searchRegex(query.search) },
-            { phone: searchRegex(query.search) },
-          ],
-        }
-      : {};
+    const filter = {
+      deletedAt: null,
+      ...(query.search
+        ? {
+            $or: [
+              { name: searchRegex(query.search) },
+              { phone: searchRegex(query.search) },
+            ],
+          }
+        : {}),
+    };
     const [data, total] = await Promise.all([
       this.customers
         .find(filter)
@@ -72,5 +77,18 @@ export class CustomersController {
       .lean();
     if (!customer) throw new NotFoundException('Customer not found.');
     return customer;
+  }
+  @Delete(':id') @Permit('customers:write') async remove(
+    @Param('id', IdPipe) id: string,
+  ) {
+    const customer = await this.customers.findOne({ _id: id, deletedAt: null });
+    if (!customer) throw new NotFoundException('Customer not found.');
+    if (customer.balanceCents > 0)
+      throw new ConflictException(
+        'Settle the customer outstanding balance before deleting them.',
+      );
+    customer.deletedAt = new Date();
+    await customer.save();
+    return { success: true };
   }
 }

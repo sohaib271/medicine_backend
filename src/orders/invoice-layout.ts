@@ -165,7 +165,7 @@ export function renderInvoice(
   text(remarks, left + 266, y, remarksWidth, 8, true, color.ink);
   y +=
     Math.max(height(area, 245, 8), height(remarks, remarksWidth, 8, true)) + 10;
-  const cols = [24, 130, 65, 48, 30, 57, 39, 52, width - 445];
+  const cols = [24, 106, 60, 43, 50, 32, 55, 35, 40, width - 445];
   let position = left;
   const positions = cols.map((columnWidth) => {
     const current = position;
@@ -205,8 +205,9 @@ export function renderInvoice(
       'Product',
       'Company',
       'Type',
-      'Qty',
-      'Rate',
+      'Pieces / Pack',
+      'Packs',
+      'Rate / Pack',
       'Disc %',
       'Disc Unit',
       'Net Amount',
@@ -242,6 +243,7 @@ export function renderInvoice(
       medicine,
       item.company || '-',
       item.type,
+      String(item.quantityPerPacking ?? 1),
       String(item.quantity),
       number(item.unitPriceCents),
       discountPercent,
@@ -251,7 +253,7 @@ export function renderInvoice(
     const rowHeight = Math.max(
       24,
       ...values.map(
-        (value, i) => height(value, cols[i] - 10, 8, i === 1 || i === 8) + 12,
+        (value, i) => height(value, cols[i] - 10, 8, i === 1 || i === 9) + 12,
       ),
     );
     if (y + rowHeight > bottom) nextPage(true);
@@ -263,7 +265,7 @@ export function renderInvoice(
         y + 6,
         cols[i] - 10,
         8,
-        i === 1 || i === 8,
+        i === 1 || i === 9,
         i === 0 ? color.muted : color.ink,
         i > 3 ? 'right' : 'left',
       ),

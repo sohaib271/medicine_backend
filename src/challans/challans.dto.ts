@@ -22,7 +22,9 @@ export class ChallanItemDto {
   @IsOptional() @Transform(trim) @IsString() @MaxLength(50) strength?: string;
   @Transform(trim) @IsString() @MinLength(1) @MaxLength(150) name: string;
   @IsIn(medicineTypes) type: (typeof medicineTypes)[number];
-  @IsInt() @Min(1) @Max(1000000) quantity: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1000000) quantity?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1000000) packs?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1000000) piecesPerPack?: number;
   @Transform(trim) @IsString() @MinLength(1) @MaxLength(100) company: string;
 }
 export class ChallanDto {

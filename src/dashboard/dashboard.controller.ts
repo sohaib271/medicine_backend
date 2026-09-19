@@ -22,12 +22,23 @@ export class DashboardController {
       recentOrders,
       trend,
     ] = await Promise.all([
-      this.products.countDocuments(),
+      this.products.countDocuments({ deletedAt: null }),
       this.products.countDocuments({
-        $expr: { $lte: ['$stock', '$alarmLimit'] },
+        deletedAt: null,
+        $or: [
+          {
+            alarmStockThreshold: { $exists: true },
+            $expr: { $lte: ['$stock', '$alarmStockThreshold'] },
+          },
+          {
+            alarmStockThreshold: { $exists: false },
+            $expr: { $lte: ['$stock', '$alarmLimit'] },
+          },
+        ],
       }),
-      this.customers.countDocuments(),
+      this.customers.countDocuments({ deletedAt: null }),
       this.customers.aggregate<{ total: number }>([
+        { $match: { deletedAt: null } },
         { $group: { _id: null, total: { $sum: '$balanceCents' } } },
       ]),
       this.orders.aggregate<{ total: number; count: number; received: number }>(
@@ -44,7 +55,19 @@ export class DashboardController {
         ],
       ),
       this.products
-        .find({ $expr: { $lte: ['$stock', '$alarmLimit'] } })
+        .find({
+          deletedAt: null,
+          $or: [
+            {
+              alarmStockThreshold: { $exists: true },
+              $expr: { $lte: ['$stock', '$alarmStockThreshold'] },
+            },
+            {
+              alarmStockThreshold: { $exists: false },
+              $expr: { $lte: ['$stock', '$alarmLimit'] },
+            },
+          ],
+        })
         .sort({ stock: 1, name: 1 })
         .limit(5)
         .lean(),

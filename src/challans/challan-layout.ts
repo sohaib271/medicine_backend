@@ -96,7 +96,7 @@ export function renderChallan(
   text(challan.challanNumber, left + 67, 90, 200);
   text('Created', left + 285, 90, 55, 8, true, muted);
   text(date(challan.createdAt), left + 340, 90, width - 340);
-  const cols = [28, 191, 100, width - 459, 140];
+  const cols = [28, 135, 76, 70, 42, width - 351];
   let position = left;
   const xs = cols.map((columnWidth) => {
     const current = position;
@@ -120,14 +120,7 @@ export function renderChallan(
     8,
     true,
   );
-  text(
-    remarks,
-    left + detailWidth + 20,
-    detailsY,
-    detailWidth,
-    8,
-    true,
-  );
+  text(remarks, left + detailWidth + 20, detailsY, detailWidth, 8, true);
   let y =
     detailsY +
     26 +
@@ -149,17 +142,18 @@ export function renderChallan(
   };
   const tableHead = () => {
     doc.roundedRect(left, y, width, 24, 4).fill(forest);
-    ['Sr', 'Product', 'Type', 'Qty', 'Company'].forEach((label, i) =>
-      text(
-        label,
-        xs[i] + 5,
-        y + 8,
-        cols[i] - 10,
-        7,
-        true,
-        '#FFFFFF',
-        i === 3 ? 'right' : 'left',
-      ),
+    ['Sr', 'Product', 'Type', 'Pieces / Pack', 'Packs', 'Company'].forEach(
+      (label, i) =>
+        text(
+          label,
+          xs[i] + 5,
+          y + 8,
+          cols[i] - 10,
+          7,
+          true,
+          '#FFFFFF',
+          i === 3 || i === 4 ? 'right' : 'left',
+        ),
     );
     y += 24;
   };
@@ -169,7 +163,8 @@ export function renderChallan(
       String(index + 1),
       [item.name, item.strength].filter(Boolean).join(' / '),
       item.type,
-      String(item.quantity),
+      String(item.piecesPerPack ?? 1),
+      String(item.packs ?? item.quantity),
       item.company,
     ];
     const h = Math.max(
@@ -192,7 +187,7 @@ export function renderChallan(
         8,
         i === 1,
         ink,
-        i === 3 ? 'right' : 'left',
+        i === 3 || i === 4 ? 'right' : 'left',
       ),
     );
     borders(y, h);
@@ -203,16 +198,6 @@ export function renderChallan(
     header();
     y = 88;
   }
-  y += 14;
-  text(
-    `${challan.items.length} product lines  /  ${challan.items.reduce((sum, item) => sum + item.quantity, 0)} total units`,
-    left,
-    y,
-    width,
-    9,
-    true,
-    forest,
-  );
   y += 40;
   doc
     .strokeColor(line)

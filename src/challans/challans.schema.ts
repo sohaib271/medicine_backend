@@ -6,6 +6,8 @@ const LineSchema = new Schema(
     strength: { type: String, trim: true },
     type: { type: String, enum: medicineTypes, required: true },
     quantity: { type: Number, required: true, min: 1 },
+    packs: { type: Number, required: true, min: 1, default: 1 },
+    piecesPerPack: { type: Number, required: true, min: 1, default: 1 },
     company: { type: String, required: true, trim: true },
   },
   { _id: false },
@@ -28,6 +30,7 @@ export const ChallanSchema = new Schema(
     },
     statusUpdatedAt: { type: Date, required: true },
     version: { type: Number, required: true, default: 0 },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

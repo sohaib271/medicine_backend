@@ -61,8 +61,17 @@ export const ProductSchema = new Schema(
     },
     discountValue: { type: Number, default: 0, required: true },
     stock: { type: Number, required: true, min: 0 },
+    quantityPerPacking: { type: Number, required: true, min: 1, default: 1 },
+    alarmType: {
+      type: String,
+      enum: ['packing', 'quantity'],
+      required: true,
+      default: 'quantity',
+    },
     alarmLimit: { type: Number, required: true, min: 0 },
+    alarmStockThreshold: { type: Number, required: true, min: 0, default: 0 },
     version: { type: Number, default: 0, required: true },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -76,6 +85,7 @@ export const CustomerSchema = new Schema(
     address: { type: String, default: '' },
     phone: { type: String, default: '' },
     balanceCents: { type: Number, default: 0, required: true, min: 0 },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -89,6 +99,7 @@ const ItemSchema = new Schema(
     type: { type: String, required: true },
     strength: { type: String, default: '' },
     quantity: { type: Number, required: true },
+    quantityPerPacking: { type: Number, required: true, min: 1, default: 1 },
     company: { type: String, default: '' },
     unitPriceCents: { type: Number, required: true },
     purchasePriceCents: { type: Number, default: null, min: 0 },

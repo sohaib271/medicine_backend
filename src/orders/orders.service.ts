@@ -146,6 +146,8 @@ export class OrdersService {
         strength: old?.strength ?? product.strength,
         company: old ? old.company : product.company,
         quantity: item.quantity,
+        quantityPerPacking:
+          old?.quantityPerPacking ?? product.quantityPerPacking ?? 1,
         unitPriceCents,
         purchasePriceCents: old
           ? old.purchasePriceCents
@@ -189,20 +191,30 @@ export class OrdersService {
     };
   }
   private async adjustStock(
-    previous: { productId: Types.ObjectId; quantity: number }[],
-    next: { productId: Types.ObjectId; quantity: number }[],
+    previous: {
+      productId: Types.ObjectId;
+      quantity: number;
+      quantityPerPacking?: number;
+    }[],
+    next: {
+      productId: Types.ObjectId;
+      quantity: number;
+      quantityPerPacking?: number;
+    }[],
     session: ClientSession,
   ) {
     const deltas = new Map<string, number>();
     for (const i of previous)
       deltas.set(
         i.productId.toString(),
-        (deltas.get(i.productId.toString()) ?? 0) + i.quantity,
+        (deltas.get(i.productId.toString()) ?? 0) +
+          i.quantity * (i.quantityPerPacking ?? 1),
       );
     for (const i of next)
       deltas.set(
         i.productId.toString(),
-        (deltas.get(i.productId.toString()) ?? 0) - i.quantity,
+        (deltas.get(i.productId.toString()) ?? 0) -
+          i.quantity * (i.quantityPerPacking ?? 1),
       );
     const writes = [...deltas]
       .filter(([, delta]) => delta !== 0)

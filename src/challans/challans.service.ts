@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -36,6 +37,7 @@ export class ChallansService implements OnModuleInit {
   }
   async list(query: ChallanQuery) {
     const filter = {
+      deletedAt: null,
       ...(query.status ? { status: query.status } : {}),
       ...(query.search
         ? {
@@ -67,7 +69,7 @@ export class ChallansService implements OnModuleInit {
   }
   async get(id: string) {
     const challan = await this.challans
-      .findById(id)
+      .findOne({ _id: id, deletedAt: null })
       .select('-requestId')
       .lean();
     if (!challan) throw new NotFoundException('Delivery challan not found.');
@@ -82,6 +84,7 @@ export class ChallansService implements OnModuleInit {
     try {
       return await this.challans.create({
         ...dto,
+        items: this.normalizedItems(dto.items),
         ...customer,
         challanNumber: await this.numbers.next(
           'DC',
@@ -116,7 +119,7 @@ export class ChallansService implements OnModuleInit {
               ? { customerAddress: dto.customerAddress }
               : {}),
             ...(dto.remarks !== undefined ? { remarks: dto.remarks } : {}),
-            items: dto.items,
+            items: this.normalizedItems(dto.items),
             status: dto.status,
             ...(current.status !== dto.status
               ? { statusUpdatedAt: new Date() }
@@ -143,5 +146,30 @@ export class ChallansService implements OnModuleInit {
       customerAddress: dto.customerAddress ?? customer.address,
       customerPhone: customer.phone,
     };
+  }
+  private normalizedItems(items: CreateChallanDto['items']) {
+    return items.map((item) => {
+      const packs = item.packs ?? item.quantity;
+      const piecesPerPack = item.piecesPerPack ?? 1;
+      if (!packs) throw new BadRequestException('Number of packs is required.');
+      const quantity = packs * piecesPerPack;
+      if (quantity > 1000000)
+        throw new BadRequestException(
+          'Total quantity for a product must not exceed 1000000.',
+        );
+      return { ...item, packs, piecesPerPack, quantity };
+    });
+  }
+  async remove(id: string, version: number) {
+    const challan = await this.challans.findOneAndUpdate(
+      { _id: id, version, deletedAt: null },
+      { $set: { deletedAt: new Date() }, $inc: { version: 1 } },
+      { new: true },
+    );
+    if (!challan)
+      throw new ConflictException(
+        'This challan changed or no longer exists. Refresh before deleting.',
+      );
+    return { success: true };
   }
 }

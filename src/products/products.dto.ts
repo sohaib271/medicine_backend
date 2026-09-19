@@ -25,9 +25,18 @@ export class ProductDto {
   @Min(0)
   @Max(10000000)
   discountValue: number;
-  @IsInt() @Min(0) @Max(1000000) stock: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) stock?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000) packing?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1000000) quantityPerPacking?: number;
+  @IsOptional() @IsIn(['packing', 'quantity']) alarmType?:
+    'packing' | 'quantity';
   @IsInt() @Min(0) @Max(1000000) alarmLimit: number;
 }
 export class UpdateProductDto extends ProductDto {
+  @IsInt() @Min(0) version: number;
+}
+export class AddInventoryDto {
+  @IsInt() @Min(1) @Max(1000000) packing: number;
+  @IsInt() @Min(1) @Max(1000000) quantityPerPacking: number;
   @IsInt() @Min(0) version: number;
 }
