@@ -65,6 +65,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     expect(cookie).toContain('SameSite=Lax');
   });
   beforeEach(async () => {
+    await db.models.Expense.deleteMany({});
     await db.models.DeliveryChallan.deleteMany({});
     await db.models.Order.deleteMany({});
     await db.models.Product.deleteMany({});
@@ -313,6 +314,130 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       items: [{ productId: created._id, quantity: 2 }],
     }).expect(201);
     expect(await stock()).toBe(144);
+    const products = await request(app.getHttpServer())
+      .get('/api/products')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(products.body.data[0]).toMatchObject({
+      stockCostCents: 18000,
+      packsSold: 2,
+      unitsSold: 16,
+      salesCents: 3000,
+      netProfitCents: 1000,
+      profitEstimated: false,
+    });
+    const dashboard = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(dashboard.body).toMatchObject({
+      stockCostCents: 18000,
+      lifetimeSalesCents: 3000,
+      soldPacks: 2,
+      soldUnits: 16,
+      netProfitCents: 1000,
+      profitEstimated: false,
+    });
+  });
+
+  it('removes an inventory adjustment without allowing negative stock', async () => {
+    const created = await product(20);
+    const updated = read(
+      await request(app.getHttpServer())
+        .patch(`/api/products/${created._id}/inventory`)
+        .set(origin)
+        .set('Cookie', cookie)
+        .send({
+          operation: 'remove',
+          packing: 3,
+          quantityPerPacking: 2,
+          version: created.version,
+        })
+        .expect(200),
+    );
+    expect(updated.stock).toBe(14);
+    expect(updated.version).toBe(1);
+
+    await request(app.getHttpServer())
+      .patch(`/api/products/${created._id}/inventory`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({
+        operation: 'remove',
+        packing: 8,
+        quantityPerPacking: 2,
+        version: updated.version,
+      })
+      .expect(409);
+    expect(await stock()).toBe(14);
+  });
+
+  it('calculates purchase cost for legacy stock without packing data', async () => {
+    const created = await product(10);
+    await db.models.Product.updateOne(
+      { _id: created._id },
+      { $unset: { quantityPerPacking: 1 } },
+    );
+    const dashboard = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(dashboard.body.stockCostCents).toBe(60000);
+
+    const products = await request(app.getHttpServer())
+      .get('/api/products')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(products.body.data[0].stockCostCents).toBe(60000);
+  });
+
+  it('tracks expenses and produces date-range business reports', async () => {
+    const date = new Date().toLocaleDateString('en-CA', {
+      timeZone: 'Asia/Karachi',
+    });
+    const p = await product(20);
+    const c = await customer();
+    await create({
+      customerId: c._id,
+      items: [{ productId: p._id, quantity: 2 }],
+    }).expect(201);
+    const expense = read(
+      await request(app.getHttpServer())
+        .post('/api/expenses')
+        .set(origin)
+        .set('Cookie', cookie)
+        .send({
+          date,
+          category: 'Delivery',
+          description: 'Local delivery',
+          amountCents: 500,
+        })
+        .expect(201),
+    );
+    const report = await request(app.getHttpServer())
+      .get(`/api/reports?from=${date}&to=${date}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(report.body.period).toMatchObject({
+      packsSold: 2,
+      unitsSold: 2,
+      salesCents: 18000,
+      stockSpentCents: 12000,
+      profitCents: 6000,
+      expenseCents: 500,
+      profitAfterExpenseCents: 5500,
+    });
+    expect(report.body.lifetime.stockLeftCents).toBe(108000);
+    await request(app.getHttpServer())
+      .get(`/api/reports/pdf?from=${date}&to=${date}`)
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect('Content-Type', /pdf/);
+    await request(app.getHttpServer())
+      .delete(`/api/expenses/${expense._id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .expect(200);
   });
 
   it('preserves purchase cost snapshots and labels legacy profit estimates', async () => {
@@ -487,7 +612,15 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     await create({
       customer: { name: 'Should Roll Back', address: '', phone: '' },
       items: [{ productId: p._id, quantity: 2 }],
-    }).expect(409);
+    })
+      .expect(409)
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          code: 'INSUFFICIENT_STOCK',
+          productIds: [p._id],
+        });
+        expect(response.body.message).toContain('Panadol');
+      });
     expect(await stock()).toBe(1);
     expect(await db.models.Customer.countDocuments()).toBe(0);
     expect(await db.models.Order.countDocuments()).toBe(0);

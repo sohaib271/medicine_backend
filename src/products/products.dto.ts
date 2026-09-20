@@ -36,6 +36,7 @@ export class UpdateProductDto extends ProductDto {
   @IsInt() @Min(0) version: number;
 }
 export class AddInventoryDto {
+  @IsOptional() @IsIn(['add', 'remove']) operation?: 'add' | 'remove';
   @IsInt() @Min(1) @Max(1000000) packing: number;
   @IsInt() @Min(1) @Max(1000000) quantityPerPacking: number;
   @IsInt() @Min(0) version: number;

@@ -229,6 +229,33 @@ export class OrdersService {
         },
       }));
     if (!writes.length) return;
+    const requiredStock = [...deltas].filter(([, delta]) => delta < 0);
+    if (requiredStock.length) {
+      const products = await this.products
+        .find({
+          _id: { $in: requiredStock.map(([id]) => new Types.ObjectId(id)) },
+        })
+        .select('_id name stock')
+        .session(session)
+        .lean();
+      const stockById = new Map(
+        products.map((product) => [product._id.toString(), product.stock]),
+      );
+      const insufficientIds = requiredStock
+        .filter(([id, delta]) => (stockById.get(id) ?? -1) < -delta)
+        .map(([id]) => id);
+      if (insufficientIds.length) {
+        const insufficientSet = new Set(insufficientIds);
+        const names = products
+          .filter((product) => insufficientSet.has(product._id.toString()))
+          .map((product) => product.name);
+        throw new ConflictException({
+          message: `Insufficient stock for ${names.join(', ')}. Refresh quantities and try again.`,
+          code: 'INSUFFICIENT_STOCK',
+          productIds: insufficientIds,
+        });
+      }
+    }
     const result = await this.products.bulkWrite(writes, { session });
     if (result.matchedCount !== writes.length)
       throw new ConflictException(

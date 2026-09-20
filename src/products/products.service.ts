@@ -4,14 +4,17 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import type { Product } from '../database/schemas';
+import { Model, Types } from 'mongoose';
+import type { Order, Product } from '../database/schemas';
 import { ListQuery, pageResult, searchRegex } from '../common/dto';
 import { cents, discountedPrice } from '../common/money';
 import { ProductDto, UpdateProductDto } from './products.dto';
 @Injectable()
 export class ProductsService {
-  constructor(@InjectModel('Product') private products: Model<Product>) {}
+  constructor(
+    @InjectModel('Product') private products: Model<Product>,
+    @InjectModel('Order') private orders: Model<Order>,
+  ) {}
   async list(query: ListQuery) {
     const filter = {
       deletedAt: null,
@@ -40,7 +43,83 @@ export class ProductsService {
         .lean(),
       this.products.countDocuments(filter),
     ]);
-    return pageResult(data, total, query);
+    const ids = data.map(
+      (product) => (product as unknown as { _id: Types.ObjectId })._id,
+    );
+    const sales = ids.length
+      ? await this.orders.aggregate<{
+          _id: Types.ObjectId;
+          packsSold: number;
+          unitsSold: number;
+          salesCents: number;
+          recordedCostCents: number;
+          legacyPacks: number;
+        }>([
+          { $match: { deletedAt: null } },
+          { $unwind: '$items' },
+          { $match: { 'items.productId': { $in: ids } } },
+          {
+            $group: {
+              _id: '$items.productId',
+              packsSold: { $sum: '$items.quantity' },
+              unitsSold: {
+                $sum: {
+                  $multiply: [
+                    '$items.quantity',
+                    { $ifNull: ['$items.quantityPerPacking', 1] },
+                  ],
+                },
+              },
+              salesCents: { $sum: '$items.totalCents' },
+              recordedCostCents: {
+                $sum: {
+                  $cond: [
+                    { $ne: ['$items.purchasePriceCents', null] },
+                    {
+                      $multiply: [
+                        '$items.purchasePriceCents',
+                        '$items.quantity',
+                      ],
+                    },
+                    0,
+                  ],
+                },
+              },
+              legacyPacks: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$items.purchasePriceCents', null] },
+                    '$items.quantity',
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ])
+      : [];
+    const salesByProduct = new Map(
+      sales.map((item) => [item._id.toString(), item]),
+    );
+    const enriched = data.map((product) => {
+      const item = salesByProduct.get(product._id.toString());
+      const estimatedCost =
+        (item?.recordedCostCents ?? 0) +
+        (item?.legacyPacks ?? 0) * product.purchasePriceCents;
+      return {
+        ...product,
+        stockCostCents: Math.round(
+          (product.stock / (product.quantityPerPacking ?? 1)) *
+            product.purchasePriceCents,
+        ),
+        packsSold: item?.packsSold ?? 0,
+        unitsSold: item?.unitsSold ?? 0,
+        salesCents: item?.salesCents ?? 0,
+        netProfitCents: (item?.salesCents ?? 0) - estimatedCost,
+        profitEstimated: (item?.legacyPacks ?? 0) > 0,
+      };
+    });
+    return pageResult(enriched, total, query);
   }
   private values(dto: ProductDto) {
     if (!dto.name.trim())
@@ -96,17 +175,21 @@ export class ProductsService {
     const addedQuantity = dto.packing * dto.quantityPerPacking;
     if (addedQuantity > 1000000)
       throw new BadRequestException('Added quantity is too large.');
+    const removing = dto.operation === 'remove';
+    const stockChange = removing ? -addedQuantity : addedQuantity;
     const product = await this.products
       .findOneAndUpdate(
         {
           _id: id,
           version: dto.version,
-          stock: { $lte: 1000000 - addedQuantity },
+          stock: removing
+            ? { $gte: addedQuantity }
+            : { $lte: 1000000 - addedQuantity },
         },
         [
           {
             $set: {
-              stock: { $add: ['$stock', addedQuantity] },
+              stock: { $add: ['$stock', stockChange] },
               version: { $add: ['$version', 1] },
               quantityPerPacking: dto.quantityPerPacking,
               alarmStockThreshold: {
@@ -124,7 +207,9 @@ export class ProductsService {
       .lean();
     if (!product)
       throw new ConflictException(
-        'Medicine changed, no longer exists, or the resulting stock is too large. Refresh before updating inventory.',
+        removing
+          ? 'Medicine changed, no longer exists, or there is not enough stock to remove. Refresh before updating inventory.'
+          : 'Medicine changed, no longer exists, or the resulting stock is too large. Refresh before updating inventory.',
       );
     return product;
   }

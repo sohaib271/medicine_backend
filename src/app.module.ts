@@ -14,6 +14,9 @@ import { OrdersService } from './orders/orders.service';
 import { InvoiceService } from './orders/invoice.service';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { ChallansModule } from './challans/challans.module';
+import { ExpensesController } from './expenses/expenses.controller';
+import { ReportsController } from './reports/reports.controller';
+import { ReportsService } from './reports/reports.service';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -49,11 +52,14 @@ import { ChallansModule } from './challans/challans.module';
     CustomersController,
     OrdersController,
     DashboardController,
+    ExpensesController,
+    ReportsController,
   ],
   providers: [
     ProductsService,
     OrdersService,
     InvoiceService,
+    ReportsService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

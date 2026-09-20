@@ -79,6 +79,19 @@ ProductSchema.index({ name: 1, _id: 1 });
 ProductSchema.index({ type: 1, name: 1 });
 export type Product = InferSchemaType<typeof ProductSchema>;
 
+export const ExpenseSchema = new Schema(
+  {
+    date: { type: Date, required: true, index: true },
+    category: { type: String, required: true, trim: true, maxlength: 80 },
+    description: { type: String, default: '', trim: true, maxlength: 300 },
+    amountCents: { type: Number, required: true, min: 1 },
+    deletedAt: { type: Date, default: null },
+  },
+  { timestamps: true },
+);
+ExpenseSchema.index({ deletedAt: 1, date: -1 });
+export type Expense = InferSchemaType<typeof ExpenseSchema>;
+
 export const CustomerSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
