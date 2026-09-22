@@ -25,6 +25,7 @@ export class DashboardController {
       trend,
       inventoryProducts,
       lifetimeSales,
+      lifetimeReceived,
     ] = await Promise.all([
       this.products.countDocuments({ deletedAt: null }),
       this.products.countDocuments({
@@ -145,6 +146,10 @@ export class DashboardController {
           },
         },
       ]),
+      this.orders.aggregate<{ total: number }>([
+        { $match: { deletedAt: null } },
+        { $group: { _id: null, total: { $sum: '$receivedCents' } } },
+      ]),
     ]);
     const purchasePriceByProduct = new Map(
       inventoryProducts.map((product) => [
@@ -196,6 +201,7 @@ export class DashboardController {
         ),
       ),
       lifetimeSalesCents,
+      lifetimeReceivedCents: lifetimeReceived[0]?.total ?? 0,
       soldPacks,
       soldUnits,
       netProfitCents: lifetimeSalesCents - soldCostCents,

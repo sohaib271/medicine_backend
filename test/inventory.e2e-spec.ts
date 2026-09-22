@@ -333,6 +333,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     expect(dashboard.body).toMatchObject({
       stockCostCents: 18000,
       lifetimeSalesCents: 3000,
+      lifetimeReceivedCents: 0,
       soldPacks: 2,
       soldUnits: 16,
       netProfitCents: 1000,
