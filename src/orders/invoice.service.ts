@@ -1,6 +1,10 @@
 ﻿import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import PDFDocument from 'pdfkit';
+// PDFKit resolves standard fonts dynamically. Explicit imports ensure Vercel's
+// serverless dependency tracer includes the modules in the function bundle.
+import 'pdfkit/standard-fonts/Helvetica';
+import 'pdfkit/standard-fonts/HelveticaBold';
 import type { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { renderInvoice } from './invoice-layout';
