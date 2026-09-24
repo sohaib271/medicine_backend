@@ -69,7 +69,6 @@ export class ChallansController {
     renderChallan(
       doc,
       challan,
-      this.config.get<string>('STORE_NAME', 'Zainab Traders'),
       this.config.get<string>('TIMEZONE', 'Asia/Karachi'),
     );
     doc.end();

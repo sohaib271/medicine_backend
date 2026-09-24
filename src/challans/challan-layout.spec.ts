@@ -15,7 +15,7 @@ describe('Delivery challan PDF', () => {
       renderChallan(
         doc,
         {
-          challanNumber: 'DC-20260914-12345678',
+          challanNumber: '1234',
           status: 'pending',
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -27,10 +27,10 @@ describe('Delivery challan PDF', () => {
             quantity: 20,
           })),
         },
-        'Zainab Traders',
         'Asia/Karachi',
       );
       const labels = spy.mock.calls.map((call) => call[0]);
+      expect(labels.join(' ')).not.toMatch(/Zainab Traders/i);
       expect(labels).toContain('CUSTOMER');
       expect(labels).toContain('AREA');
       expect(labels).toContain('Remarks : -');

@@ -83,6 +83,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       status: 'pending',
       statusUpdatedAt: new Date(),
     });
+    await db.models.Order.collection.insertOne({ invoiceNumber: 'ZT-41' });
     const numbers = app.get(DocumentNumberService);
     const issued = await Promise.all(
       Array.from({ length: 8 }, () =>
@@ -91,7 +92,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     );
     expect(new Set(issued).size).toBe(8);
     expect(
-      issued.map((value) => Number(value.slice(3))).sort((a, b) => a - b),
+      issued.map(Number).sort((a, b) => a - b),
     ).toEqual([24, 25, 26, 27, 28, 29, 30, 31]);
     await db.models.DeliveryChallan.deleteMany({});
     expect(
@@ -99,7 +100,10 @@ describe('Medical store API with isolated MongoDB transactions', () => {
         'DC',
         db.models.DeliveryChallan.collection.collectionName,
       ),
-    ).toBe('DC-32');
+    ).toBe('32');
+    expect(
+      await numbers.next('invoice', db.models.Order.collection.collectionName),
+    ).toBe('42');
   });
   it('creates, edits and downloads non-billing delivery challans without changing stock', async () => {
     const medicine = await product(10);
@@ -398,10 +402,15 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     });
     const p = await product(20);
     const c = await customer();
-    await create({
-      customerId: c._id,
-      items: [{ productId: p._id, quantity: 2 }],
-    }).expect(201);
+    const createdOrder = read(
+      await create({
+        customerId: c._id,
+        items: [{ productId: p._id, quantity: 2 }],
+      }).expect(201),
+    );
+    expect((createdOrder as unknown as { invoiceNumber: string }).invoiceNumber).toMatch(
+      /^\d+$/,
+    );
     const expense = read(
       await request(app.getHttpServer())
         .post('/api/expenses')
@@ -497,6 +506,36 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     );
     expect(legacy.profitCents).toBe(-3000);
     expect(legacy.profitEstimated).toBe(true);
+  });
+
+  it('uses a bill-specific sale price without changing the product price', async () => {
+    const p = await product(10);
+    const c = await customer();
+    const order = read(
+      await create({
+        customerId: c._id,
+        items: [
+          {
+            productId: p._id,
+            quantity: 2,
+            salePrice: 75,
+            discountType: 'percent',
+            discountValue: 0,
+          },
+        ],
+      }).expect(201),
+    );
+    expect(order.totalCents).toBe(15000);
+    const storedOrder = await request(app.getHttpServer())
+      .get(`/api/orders/${order._id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(storedOrder.body.items[0].unitPriceCents).toBe(7500);
+    const products = await request(app.getHttpServer())
+      .get('/api/products')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(products.body.data[0].salePriceCents).toBe(10000);
   });
   it('protects API routes and blocks cross-origin mutations', async () => {
     await request(app.getHttpServer()).get('/api/products').expect(401);

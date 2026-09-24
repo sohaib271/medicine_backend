@@ -9,7 +9,7 @@ function pageCount(count: number) {
   renderInvoice(
     doc,
     {
-      invoiceNumber: 'ZT-20260913-5486E449',
+      invoiceNumber: '5486',
       customerName: 'Sample Customer',
       customerAddress: 'Garden Town\nLahore',
       customerPhone: '0300 1234567',
@@ -37,7 +37,7 @@ function pageCount(count: number) {
       receivedCents: 50000,
       remainingCents: total - 50000,
     },
-    { storeName: 'Zainab Traders', currency: 'PKR', timezone: 'Asia/Karachi' },
+    { currency: 'PKR', timezone: 'Asia/Karachi' },
   );
   const pages = doc.bufferedPageRange().count;
   doc.end();

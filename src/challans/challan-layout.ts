@@ -14,7 +14,6 @@ export function renderChallan(
     | 'customerAddress'
     | 'remarks'
   >,
-  storeName: string,
   timezone: string,
 ) {
   const forest = '#173F35',
@@ -61,9 +60,9 @@ export function renderChallan(
     doc.roundedRect(left, 19, 28, 28, 7).fill(lime);
     doc.rect(left + 12, 25, 4, 16).fill(forest);
     doc.rect(left + 6, 31, 16, 4).fill(forest);
-    text(storeName, left + 38, 18, 310, 16, true, '#FFFFFF');
+    text('DELIVERY CHALLAN', left + 38, 18, 310, 16, true, '#FFFFFF');
     text(
-      'MEDICINE COMPANY / DELIVERY CHALLAN',
+      'MEDICINE COMPANY',
       left + 38,
       40,
       310,

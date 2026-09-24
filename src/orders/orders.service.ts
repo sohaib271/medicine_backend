@@ -128,8 +128,11 @@ export class OrdersService {
       if (!product)
         throw new BadRequestException('A selected medicine no longer exists.');
       const old = previousById.get(item.productId);
-      // Preserve invoiced prices when editing existing lines; new lines use the current price.
-      const unitPriceCents = old?.unitPriceCents ?? product.salePriceCents;
+      // A bill-level override is snapshotted on the order and never changes the product price.
+      const unitPriceCents =
+        item.salePrice !== undefined
+          ? cents(item.salePrice)
+          : (old?.unitPriceCents ?? product.salePriceCents);
       const discountType =
         item.discountType ?? old?.discountType ?? product.discountType;
       const discountValue =
@@ -278,7 +281,7 @@ export class OrdersService {
       return existing;
     }
     const invoiceNumber = await this.numbers.next(
-      'ZT',
+      'invoice',
       this.orders.collection.collectionName,
     );
     try {
