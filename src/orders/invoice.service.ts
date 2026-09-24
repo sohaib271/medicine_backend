@@ -19,7 +19,6 @@ export class InvoiceService {
       bufferPages: true,
       info: {
         Title: order.invoiceNumber,
-        Author: this.config.get<string>('STORE_NAME', 'Zainab Traders'),
       },
     });
     res.setHeader('Content-Type', 'application/pdf');
@@ -29,7 +28,6 @@ export class InvoiceService {
     );
     doc.pipe(res);
     renderInvoice(doc, order, {
-      storeName: this.config.get<string>('STORE_NAME', 'Zainab Traders'),
       currency: this.config.get<string>('CURRENCY', 'PKR'),
       timezone: this.config.get<string>('TIMEZONE', 'Asia/Karachi'),
     });

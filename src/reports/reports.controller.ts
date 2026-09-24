@@ -1,5 +1,4 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Permit } from '../auth/auth.guard';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
@@ -8,10 +7,7 @@ import { ReportsService } from './reports.service';
 
 @Controller('reports')
 export class ReportsController {
-  constructor(
-    private reports: ReportsService,
-    private config: ConfigService,
-  ) {}
+  constructor(private reports: ReportsService) {}
 
   @Get() @Permit('dashboard:read') get(@Query() query: ReportQuery) {
     return this.reports.summary(query.from, query.to);
@@ -22,11 +18,10 @@ export class ReportsController {
     @Res() res: Response,
   ) {
     const report = await this.reports.summary(query.from, query.to);
-    const storeName = this.config.get<string>('STORE_NAME', 'Zainab Traders');
     const doc = new PDFDocument({
       size: 'A4',
       margin: 48,
-      info: { Title: `Business report ${query.from} to ${query.to}`, Author: storeName },
+      info: { Title: `Business report ${query.from} to ${query.to}` },
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader(
@@ -36,8 +31,7 @@ export class ReportsController {
     doc.pipe(res);
     const money = (value: number) =>
       `PKR ${(value / 100).toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    doc.fillColor('#26483d').fontSize(22).text(storeName);
-    doc.fillColor('#6d7d70').fontSize(10).text('Business performance report');
+    doc.fillColor('#26483d').fontSize(22).text('Business performance report');
     doc.moveDown(0.5).fontSize(11).text(`${query.from} to ${query.to}`);
     doc.moveDown(1.5);
     const section = (

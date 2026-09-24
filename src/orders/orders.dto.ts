@@ -19,6 +19,11 @@ import { CustomerDto } from '../customers/customers.dto';
 export class OrderItemDto {
   @IsMongoId() productId: string;
   @IsInt() @Min(1) @Max(1000000) quantity: number;
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(10000000)
+  salePrice?: number;
   @IsOptional() @IsIn(['percent', 'fixed']) discountType?: 'percent' | 'fixed';
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })

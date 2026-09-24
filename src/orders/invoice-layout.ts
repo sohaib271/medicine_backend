@@ -21,7 +21,6 @@ type InvoiceData = Pick<
   | 'remainingCents'
 > & { remarks?: string };
 interface InvoiceSettings {
-  storeName: string;
   currency: string;
   timezone: string;
 }
@@ -92,18 +91,9 @@ export function renderInvoice(
     doc.roundedRect(left, 19, 28, 28, 7).fill(color.lime);
     doc.rect(left + 12, 25, 4, 16).fill(color.forest);
     doc.rect(left + 6, 31, 16, 4).fill(color.forest);
-    const nameSize =
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(16)
-        .widthOfString(settings.storeName) > 310
-        ? 12
-        : 16;
-    text(settings.storeName, left + 38, 18, 310, nameSize, true, '#FFFFFF');
+    text('SALES INVOICE', left + 38, 18, 310, 16, true, '#FFFFFF');
     text(
-      continued
-        ? 'SALES INVOICE / CONTINUED'
-        : 'MEDICINE COMPANY / SALES INVOICE',
+      continued ? 'CONTINUED' : 'MEDICINE COMPANY',
       left + 38,
       40,
       310,
