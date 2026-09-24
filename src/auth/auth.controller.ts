@@ -27,12 +27,15 @@ export class AuthController {
     private config: ConfigService,
   ) {}
   private cookieOptions(): CookieOptions {
+    const production =
+      this.config.get('NODE_ENV') === 'production' &&
+      process.env.LOCAL_DESKTOP !== 'true';
     return {
       httpOnly: true,
-      secure:
-        this.config.get('NODE_ENV') === 'production' &&
-        process.env.LOCAL_DESKTOP !== 'true',
-      sameSite: 'lax',
+      secure: production,
+      // Separate Vercel projects are cross-site, so production auth cookies
+      // must explicitly opt in to cross-site credentialed requests.
+      sameSite: production ? 'none' : 'lax',
       path: '/api',
     };
   }
