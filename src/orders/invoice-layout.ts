@@ -1,5 +1,6 @@
 import type PDFDocument from 'pdfkit';
 import type { Order } from '../database/schemas';
+import { displayInvoiceNumber } from './invoice-number';
 
 type InvoiceData = Pick<
   Order,
@@ -31,6 +32,7 @@ export function renderInvoice(
   order: InvoiceData,
   settings: InvoiceSettings,
 ) {
+  const invoiceNumber = displayInvoiceNumber(order.invoiceNumber);
   const color = {
     forest: '#173F35',
     cream: '#E9EFDE',
@@ -134,7 +136,7 @@ export function renderInvoice(
   }
   let metaY = y;
   for (const [label, value] of [
-    ['Invoice No.', order.invoiceNumber],
+    ['Invoice No.', invoiceNumber],
     ['Date', date(order.createdAt)],
   ]) {
     text(label, left + 266, metaY + 1, 63, 7, false, color.muted);
@@ -356,7 +358,7 @@ export function renderInvoice(
       );
     }
     rule(780);
-    text(order.invoiceNumber, left, 788, 250, 7, false, color.muted);
+    text(invoiceNumber, left, 788, 250, 7, false, color.muted);
     text(
       `Page ${page + 1} of ${range.count}`,
       left + width - 120,

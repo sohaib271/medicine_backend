@@ -11,6 +11,7 @@ import type { Customer, Order, Product } from '../database/schemas';
 import { ListQuery, pageResult, searchRegex } from '../common/dto';
 import { cents, discountedPrice, paymentStatus } from '../common/money';
 import { receivedProfit } from './profit';
+import { displayInvoiceNumber } from './invoice-number';
 import {
   CreateOrderDto,
   OrderItemDto,
@@ -69,7 +70,11 @@ export class OrdersService {
     return (await this.withProfit([order]))[0];
   }
   private async withProfit<
-    T extends { items: Order['items']; receivedCents: number },
+    T extends {
+      invoiceNumber: string;
+      items: Order['items'];
+      receivedCents: number;
+    },
   >(orders: T[]) {
     const missingIds = [
       ...new Set(
@@ -94,6 +99,7 @@ export class OrdersService {
     );
     return orders.map((order) => ({
       ...order,
+      invoiceNumber: displayInvoiceNumber(order.invoiceNumber),
       profitEstimated: order.items.some(
         (item) => item.purchasePriceCents == null,
       ),
