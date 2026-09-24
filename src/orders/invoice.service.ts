@@ -8,6 +8,7 @@ import 'pdfkit/standard-fonts/HelveticaBold';
 import type { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { renderInvoice } from './invoice-layout';
+import { displayInvoiceNumber } from './invoice-number';
 
 @Injectable()
 export class InvoiceService {
@@ -17,12 +18,13 @@ export class InvoiceService {
   ) {}
   async download(id: string, res: Response) {
     const order = await this.orders.get(id);
+    const invoiceNumber = displayInvoiceNumber(order.invoiceNumber);
     const doc = new PDFDocument({
       size: 'A4',
       margin: 40,
       bufferPages: true,
       info: {
-        Title: order.invoiceNumber,
+        Title: invoiceNumber,
       },
     });
     const chunks: Buffer[] = [];
@@ -41,7 +43,7 @@ export class InvoiceService {
     res.setHeader('Content-Length', pdf.length);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${order.invoiceNumber}.pdf"`,
+      `attachment; filename="${invoiceNumber}.pdf"`,
     );
     res.end(pdf);
   }
