@@ -14,7 +14,7 @@ if (-not (Test-Path '..\medicine_frontend\dist\index.html')) {
 New-Item -ItemType Directory -Force '.data' | Out-Null
 
 # Give MongoDB time to start after Windows boots.
-for ($attempt = 1; $attempt -le 30; $attempt++) {
+for ($attempt = 1; $attempt -le 150; $attempt++) {
     & $node 'scripts\check-db.cjs' *> $null
     if ($LASTEXITCODE -eq 0) { break }
     Start-Sleep -Seconds 2
