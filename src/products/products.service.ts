@@ -56,6 +56,7 @@ export class ProductsService {
           legacyPacks: number;
         }>([
           { $match: { deletedAt: null } },
+          { $set: { itemTotalBeforeOverall: { $sum: '$items.totalCents' } } },
           { $unwind: '$items' },
           { $match: { 'items.productId': { $in: ids } } },
           {
@@ -70,7 +71,30 @@ export class ProductsService {
                   ],
                 },
               },
-              salesCents: { $sum: '$items.totalCents' },
+              salesCents: {
+                $sum: {
+                  $round: [
+                    {
+                      $subtract: [
+                        '$items.totalCents',
+                        {
+                          $multiply: [
+                            { $ifNull: ['$overallDiscountCents', 0] },
+                            {
+                              $cond: [
+                                { $gt: ['$itemTotalBeforeOverall', 0] },
+                                { $divide: ['$items.totalCents', '$itemTotalBeforeOverall'] },
+                                0,
+                              ],
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                    0,
+                  ],
+                },
+              },
               recordedCostCents: {
                 $sum: {
                   $cond: [

@@ -148,6 +148,7 @@ export const OrderSchema = new Schema(
     subtotalCents: { type: Number, required: true },
     profitCents: { type: Number, default: null },
     discountCents: { type: Number, required: true },
+    overallDiscountCents: { type: Number, required: true, min: 0, default: 0 },
     totalCents: { type: Number, required: true },
     previousPendingCents: { type: Number, required: true },
     grandTotalCents: { type: Number, required: true },
@@ -169,3 +170,22 @@ OrderSchema.index({ deletedAt: 1, createdAt: -1 });
 OrderSchema.index({ customerId: 1, deletedAt: 1, createdAt: -1 });
 OrderSchema.index({ status: 1, deletedAt: 1, createdAt: -1 });
 export type Order = InferSchemaType<typeof OrderSchema>;
+
+const PaymentAllocationSchema = new Schema(
+  {
+    orderId: { type: Schema.Types.ObjectId, required: true },
+    invoiceNumber: { type: String, required: true },
+    amountCents: { type: Number, required: true, min: 1 },
+  },
+  { _id: false },
+);
+export const CustomerPaymentSchema = new Schema(
+  {
+    requestId: { type: String, required: true, unique: true },
+    customerId: { type: Schema.Types.ObjectId, required: true, index: true },
+    amountCents: { type: Number, required: true, min: 1 },
+    allocations: { type: [PaymentAllocationSchema], required: true },
+  },
+  { timestamps: true },
+);
+export type CustomerPayment = InferSchemaType<typeof CustomerPaymentSchema>;

@@ -111,6 +111,7 @@ export class DashboardController {
         legacyPacks: number;
       }>([
         { $match: { deletedAt: null } },
+        { $set: { itemTotalBeforeOverall: { $sum: '$items.totalCents' } } },
         { $unwind: '$items' },
         {
           $group: {
@@ -124,7 +125,30 @@ export class DashboardController {
                 ],
               },
             },
-            salesCents: { $sum: '$items.totalCents' },
+            salesCents: {
+              $sum: {
+                $round: [
+                  {
+                    $subtract: [
+                      '$items.totalCents',
+                      {
+                        $multiply: [
+                          { $ifNull: ['$overallDiscountCents', 0] },
+                          {
+                            $cond: [
+                              { $gt: ['$itemTotalBeforeOverall', 0] },
+                              { $divide: ['$items.totalCents', '$itemTotalBeforeOverall'] },
+                              0,
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                  0,
+                ],
+              },
+            },
             recordedCostCents: {
               $sum: {
                 $cond: [

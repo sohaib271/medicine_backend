@@ -7,7 +7,7 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model, Types } from 'mongoose';
 import { DocumentNumberService } from '../database/document-number.service';
-import type { Customer, Order, Product } from '../database/schemas';
+import type { Customer, CustomerPayment, Order, Product } from '../database/schemas';
 import { ListQuery, pageResult, searchRegex } from '../common/dto';
 import { cents, discountedPrice, paymentStatus } from '../common/money';
 import { receivedProfit } from './profit';
@@ -16,6 +16,7 @@ import {
   CreateOrderDto,
   OrderItemDto,
   PaymentDto,
+  PendingPaymentDto,
   UpdateOrderDto,
 } from './orders.dto';
 
@@ -27,6 +28,7 @@ export class OrdersService {
     @InjectModel('Order') private orders: Model<Order>,
     @InjectModel('Product') private products: Model<Product>,
     @InjectModel('Customer') private customers: Model<Customer>,
+    @InjectModel('CustomerPayment') private customerPayments: Model<CustomerPayment>,
   ) {}
   async list(query: ListQuery) {
     const filter = {
@@ -67,7 +69,90 @@ export class OrdersService {
       .findOne({ _id: id, deletedAt: null })
       .lean();
     if (!order) throw new NotFoundException('Order not found.');
-    return (await this.withProfit([order]))[0];
+    const latest = await this.orders
+      .findOne({ customerId: order.customerId, deletedAt: null })
+      .sort({ createdAt: -1, _id: -1 })
+      .select('_id')
+      .lean();
+    return {
+      ...(await this.withProfit([order]))[0],
+      isLatestForCustomer: latest?._id.toString() === order._id.toString(),
+    };
+  }
+
+  async applyPendingPayment(customerId: string, dto: PendingPaymentDto) {
+    const amountCents = cents(dto.amount);
+    return this.connection.transaction(async (session) => {
+      const existing = await this.customerPayments
+        .findOne({ requestId: dto.requestId })
+        .session(session)
+        .lean();
+      if (existing) {
+        if (existing.customerId.toString() !== customerId)
+          throw new ConflictException('This payment request was already used.');
+        const customer = await this.customers.findById(customerId).session(session).lean();
+        return { ...existing, balanceCents: customer?.balanceCents ?? 0 };
+      }
+      const customer = await this.customers
+        .findOne({ _id: customerId, deletedAt: null })
+        .session(session);
+      if (!customer) throw new NotFoundException('Customer not found.');
+      if (amountCents > customer.balanceCents)
+        throw new BadRequestException(
+          'Payment cannot exceed the customer outstanding balance.',
+        );
+      const orders = await this.orders
+        .find({ customerId, deletedAt: null, remainingCents: { $gt: 0 } })
+        .sort({ createdAt: -1, _id: -1 })
+        .session(session);
+      const outstanding = orders.reduce(
+        (sum, order) => sum + order.remainingCents,
+        0,
+      );
+      if (outstanding !== customer.balanceCents)
+        throw new ConflictException(
+          'Customer balance changed or needs reconciliation. Refresh and try again.',
+        );
+      let unallocated = amountCents;
+      const allocations: {
+        orderId: Types.ObjectId;
+        invoiceNumber: string;
+        amountCents: number;
+      }[] = [];
+      const now = new Date();
+      for (const order of orders) {
+        if (!unallocated) break;
+        const allocated = Math.min(unallocated, order.remainingCents);
+        order.receivedCents += allocated;
+        order.remainingCents -= allocated;
+        const nextStatus = paymentStatus(order.totalCents, order.receivedCents);
+        if (order.status !== nextStatus) {
+          order.status = nextStatus;
+          order.statusUpdatedAt = now;
+          order.statusHistory.push({
+            status: nextStatus,
+            at: now,
+            receivedCents: order.receivedCents,
+          });
+        }
+        order.profitCents = receivedProfit(order.receivedCents, order.items);
+        order.version += 1;
+        await order.save({ session });
+        allocations.push({
+          orderId: order._id,
+          invoiceNumber: displayInvoiceNumber(order.invoiceNumber),
+          amountCents: allocated,
+        });
+        unallocated -= allocated;
+      }
+      customer.balanceCents -= amountCents;
+      await customer.save({ session });
+      const [payment] = await this.customerPayments.create(
+        [{ requestId: dto.requestId, customerId, amountCents, allocations }],
+        { session },
+      );
+      return { ...payment.toObject(), balanceCents: customer.balanceCents };
+    });
   }
   private async withProfit<
     T extends {
@@ -177,12 +262,19 @@ export class OrdersService {
     }[],
     receivedAmount: number,
     previousPendingCents: number,
+    overallDiscountAmount = 0,
   ) {
     const subtotalCents = items.reduce(
       (sum, i) => sum + i.unitPriceCents * i.quantity,
       0,
     );
-    const totalCents = items.reduce((sum, i) => sum + i.totalCents, 0);
+    const itemTotalCents = items.reduce((sum, i) => sum + i.totalCents, 0);
+    const overallDiscountCents = cents(overallDiscountAmount);
+    if (overallDiscountCents > itemTotalCents)
+      throw new BadRequestException(
+        'Overall discount cannot exceed the order amount.',
+      );
+    const totalCents = itemTotalCents - overallDiscountCents;
     const receivedCents = cents(receivedAmount);
     if (!Number.isSafeInteger(subtotalCents + previousPendingCents))
       throw new BadRequestException('Order amount is too large.');
@@ -192,6 +284,7 @@ export class OrdersService {
       profitCents: receivedProfit(receivedCents, items),
       totalCents,
       discountCents: subtotalCents - totalCents,
+      overallDiscountCents,
       receivedCents,
       remainingCents: totalCents - receivedCents,
       previousPendingCents,
@@ -312,6 +405,7 @@ export class OrdersService {
           items,
           dto.receivedAmount,
           customer.balanceCents,
+          dto.overallDiscount ?? 0,
         );
         await this.adjustStock([], items, session);
         // Touching the customer serializes simultaneous bills/payments for accurate carried balances.
@@ -376,6 +470,9 @@ export class OrdersService {
         items,
         dto.receivedAmount,
         order.previousPendingCents,
+        'items' in dto
+          ? (dto.overallDiscount ?? 0)
+          : (order.overallDiscountCents ?? 0) / 100,
       );
       if ('items' in dto) await this.adjustStock(order.items, items, session);
       await this.customers.updateOne(

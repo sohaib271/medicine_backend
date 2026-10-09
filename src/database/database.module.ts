@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { DocumentNumberService } from './document-number.service';
 import {
   CustomerSchema,
+  CustomerPaymentSchema,
   ExpenseSchema,
   OrderSchema,
   ProductSchema,
@@ -19,6 +20,7 @@ import {
       { name: 'Role', schema: RoleSchema },
       { name: 'Product', schema: ProductSchema },
       { name: 'Customer', schema: CustomerSchema },
+      { name: 'CustomerPayment', schema: CustomerPaymentSchema },
       { name: 'Expense', schema: ExpenseSchema },
       { name: 'Order', schema: OrderSchema },
     ]),

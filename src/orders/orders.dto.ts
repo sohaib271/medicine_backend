@@ -49,6 +49,11 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(10000000000000)
+  overallDiscount?: number;
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(10000000000000)
@@ -67,6 +72,11 @@ export class UpdateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(10000000000000)
+  overallDiscount?: number;
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   @Max(10000000000000)
@@ -78,4 +88,11 @@ export class PaymentDto {
   @Min(0)
   @Max(10000000000000)
   receivedAmount: number;
+}
+export class PendingPaymentDto {
+  @IsUUID() requestId: string;
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(10000000000000)
+  amount: number;
 }

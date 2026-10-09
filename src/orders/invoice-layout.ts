@@ -15,6 +15,7 @@ type InvoiceData = Pick<
   | 'items'
   | 'subtotalCents'
   | 'discountCents'
+  | 'overallDiscountCents'
   | 'totalCents'
   | 'previousPendingCents'
   | 'grandTotalCents'
@@ -268,6 +269,8 @@ export function renderInvoice(
   });
   y += 12;
   const rows = [
+    ['Subtotal', order.subtotalCents],
+    ['Discount', -order.discountCents],
     ['Total', order.totalCents],
     ['Previous Balance', order.previousPendingCents],
     ['Total Amount', order.grandTotalCents],

@@ -18,9 +18,14 @@ import { Permit } from '../auth/auth.guard';
 import { ListQuery, pageResult, searchRegex } from '../common/dto';
 import { IdPipe } from '../common/id.pipe';
 import { CustomerDto } from './customers.dto';
+import { OrdersService } from '../orders/orders.service';
+import { PendingPaymentDto } from '../orders/orders.dto';
 @Controller('customers')
 export class CustomersController {
-  constructor(@InjectModel('Customer') private customers: Model<Customer>) {}
+  constructor(
+    @InjectModel('Customer') private customers: Model<Customer>,
+    private orders: OrdersService,
+  ) {}
   @Get() @Permit('customers:read') async list(@Query() query: ListQuery) {
     const filter = {
       deletedAt: null,
@@ -55,6 +60,12 @@ export class CustomersController {
     if (!dto.name.trim())
       throw new BadRequestException('Customer name is required.');
     return this.customers.create({ ...dto, name: dto.name.trim() });
+  }
+  @Post(':id/pending-payment') @Permit('orders:write') pendingPayment(
+    @Param('id', IdPipe) id: string,
+    @Body() dto: PendingPaymentDto,
+  ) {
+    return this.orders.applyPendingPayment(id, dto);
   }
   @Put(':id') @Permit('customers:write') async update(
     @Param('id', IdPipe) id: string,

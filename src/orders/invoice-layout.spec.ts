@@ -31,6 +31,7 @@ function pageCount(count: number) {
       })),
       subtotalCents: count * 36000,
       discountCents: count * 3600,
+      overallDiscountCents: 0,
       totalCents: total,
       previousPendingCents: 25000,
       grandTotalCents: total + 25000,

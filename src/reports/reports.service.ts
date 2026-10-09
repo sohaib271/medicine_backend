@@ -32,6 +32,7 @@ export class ReportsService {
   private sales(match: Record<string, unknown>) {
     return this.orders.aggregate<SalesRow>([
       { $match: { deletedAt: null, ...match } },
+      { $set: { itemTotalBeforeOverall: { $sum: '$items.totalCents' } } },
       { $unwind: '$items' },
       {
         $group: {
@@ -45,7 +46,30 @@ export class ReportsService {
               ],
             },
           },
-          salesCents: { $sum: '$items.totalCents' },
+          salesCents: {
+            $sum: {
+              $round: [
+                {
+                  $subtract: [
+                    '$items.totalCents',
+                    {
+                      $multiply: [
+                        { $ifNull: ['$overallDiscountCents', 0] },
+                        {
+                          $cond: [
+                            { $gt: ['$itemTotalBeforeOverall', 0] },
+                            { $divide: ['$items.totalCents', '$itemTotalBeforeOverall'] },
+                            0,
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+                0,
+              ],
+            },
+          },
           recordedCostCents: {
             $sum: {
               $cond: [

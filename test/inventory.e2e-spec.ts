@@ -65,6 +65,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     expect(cookie).toContain('SameSite=Lax');
   });
   beforeEach(async () => {
+    await db.models.CustomerPayment.deleteMany({});
     await db.models.Expense.deleteMany({});
     await db.models.DeliveryChallan.deleteMany({});
     await db.models.Order.deleteMany({});
@@ -536,6 +537,103 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       .set('Cookie', cookie)
       .expect(200);
     expect(products.body.data[0].salePriceCents).toBe(10000);
+  });
+
+  it('applies an overall rupee discount to only that order', async () => {
+    const p = await product(10);
+    const c = await customer();
+    const order = read(
+      await create({
+        customerId: c._id,
+        items: [
+          {
+            productId: p._id,
+            quantity: 2,
+            discountType: 'percent',
+            discountValue: 0,
+          },
+        ],
+        overallDiscount: 20,
+      }).expect(201),
+    );
+    expect(order.subtotalCents).toBe(20000);
+    expect(order.discountCents).toBe(2000);
+    expect(
+      (order as unknown as { overallDiscountCents: number })
+        .overallDiscountCents,
+    ).toBe(2000);
+    expect(order.totalCents).toBe(18000);
+
+    const products = await request(app.getHttpServer())
+      .get('/api/products')
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(products.body.data[0].salesCents).toBe(18000);
+
+    await create({
+      customerId: c._id,
+      items: [{ productId: p._id, quantity: 1 }],
+      overallDiscount: 101,
+    }).expect(400);
+  });
+
+  it('allocates one customer payment newest-order-first and only once', async () => {
+    const p = await product(10);
+    const c = await customer();
+    const makeOrder = (salePrice: number) =>
+      create({
+        customerId: c._id,
+        items: [
+          {
+            productId: p._id,
+            quantity: 1,
+            salePrice,
+            discountType: 'percent',
+            discountValue: 0,
+          },
+        ],
+      });
+    const older = read(await makeOrder(20).expect(201));
+    const newer = read(await makeOrder(5).expect(201));
+    expect((await getCustomer(c._id)).balanceCents).toBe(2500);
+
+    const requestId = randomUUID();
+    const payment = await request(app.getHttpServer())
+      .post(`/api/customers/${c._id}/pending-payment`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ requestId, amount: 15 })
+      .expect(201);
+    expect(payment.body.balanceCents).toBe(1000);
+    expect(payment.body.allocations).toEqual([
+      expect.objectContaining({ orderId: newer._id, amountCents: 500 }),
+      expect.objectContaining({ orderId: older._id, amountCents: 1000 }),
+    ]);
+    const newerAfter = await request(app.getHttpServer())
+      .get(`/api/orders/${newer._id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    const olderAfter = await request(app.getHttpServer())
+      .get(`/api/orders/${older._id}`)
+      .set('Cookie', cookie)
+      .expect(200);
+    expect(newerAfter.body).toMatchObject({ remainingCents: 0, status: 'paid' });
+    expect(olderAfter.body).toMatchObject({ remainingCents: 1000, status: 'partial' });
+
+    await request(app.getHttpServer())
+      .post(`/api/customers/${c._id}/pending-payment`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ requestId, amount: 15 })
+      .expect(201);
+    expect((await getCustomer(c._id)).balanceCents).toBe(1000);
+
+    await request(app.getHttpServer())
+      .post(`/api/customers/${c._id}/pending-payment`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({ requestId: randomUUID(), amount: 11 })
+      .expect(400);
   });
   it('protects API routes and blocks cross-origin mutations', async () => {
     await request(app.getHttpServer()).get('/api/products').expect(401);
