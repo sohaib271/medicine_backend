@@ -19,9 +19,13 @@ export const permissions = [
   'orders:read',
   'orders:write',
   'dashboard:read',
+  'financials:read',
   'challans:read',
   'challans:write',
 ] as const;
+export const operatorPermissions = permissions.filter(
+  (permission) => permission !== 'financials:read',
+);
 
 export const RoleSchema = new Schema(
   {
@@ -97,6 +101,7 @@ export const CustomerSchema = new Schema(
     name: { type: String, required: true, trim: true },
     address: { type: String, default: '' },
     phone: { type: String, default: '' },
+    licenseNumber: { type: String, default: '', trim: true },
     balanceCents: { type: Number, default: 0, required: true, min: 0 },
     deletedAt: { type: Date, default: null },
   },

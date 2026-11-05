@@ -9,11 +9,11 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private reports: ReportsService) {}
 
-  @Get() @Permit('dashboard:read') get(@Query() query: ReportQuery) {
+  @Get() @Permit('financials:read') get(@Query() query: ReportQuery) {
     return this.reports.summary(query.from, query.to);
   }
 
-  @Get('pdf') @Permit('dashboard:read') async pdf(
+  @Get('pdf') @Permit('financials:read') async pdf(
     @Query() query: ReportQuery,
     @Res() res: Response,
   ) {

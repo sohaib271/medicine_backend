@@ -44,10 +44,11 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     await app.init();
     db = app.get<Connection>(getConnectionToken());
     await Promise.all(Object.values(db.models).map((model) => model.init()));
-    await db.models.Role.create({
-      name: 'admin',
-      permissions: [...permissions],
-    });
+    await db.models.Role.updateOne(
+      { name: 'admin' },
+      { $set: { permissions: [...permissions] } },
+      { upsert: true },
+    );
     await db.models.User.create({
       name: 'Test Admin',
       email: 'admin@test.local',
@@ -65,6 +66,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     expect(cookie).toContain('SameSite=Lax');
   });
   beforeEach(async () => {
+    await db.models.Warranty.deleteMany({});
     await db.models.CustomerPayment.deleteMany({});
     await db.models.Expense.deleteMany({});
     await db.models.DeliveryChallan.deleteMany({});
@@ -172,6 +174,67 @@ describe('Medical store API with isolated MongoDB transactions', () => {
     expect(storedProduct?.stock).toBe(10);
     expect(await db.models.Order.countDocuments()).toBe(0);
     expect(await db.models.DeliveryChallan.countDocuments()).toBe(1);
+  });
+  it('creates invoice-style warranties with customer license and no stock change', async () => {
+    const p = await product(10);
+    const customerResponse = await request(app.getHttpServer())
+      .post('/api/customers')
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({
+        name: 'Licensed Customer',
+        address: 'Gujranwala',
+        phone: '03000000000',
+        licenseNumber: 'LIC-12345',
+      })
+      .expect(201);
+    const requestId = randomUUID();
+    const created = await request(app.getHttpServer())
+      .post('/api/warranties')
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({
+        requestId,
+        customerId: customerResponse.body._id,
+        items: [
+          {
+            productId: p._id,
+            quantity: 2,
+            salePrice: 100,
+            discountType: 'percent',
+            discountValue: 10,
+          },
+        ],
+        overallDiscount: 5,
+        remarks: 'Warranty test',
+      })
+      .expect(201);
+    expect(created.body).toMatchObject({
+      customerLicenseNumber: 'LIC-12345',
+      subtotalCents: 20000,
+      discountCents: 2500,
+      overallDiscountCents: 500,
+      totalCents: 17500,
+    });
+    expect(created.body.warrantyNumber).toMatch(/^\d+$/);
+    expect(await stock()).toBe(10);
+    const retry = await request(app.getHttpServer())
+      .post('/api/warranties')
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({
+        requestId,
+        customerId: customerResponse.body._id,
+        items: [{ productId: p._id, quantity: 1, salePrice: 1, discountType: 'percent', discountValue: 0 }],
+        overallDiscount: 0,
+      })
+      .expect(201);
+    expect(retry.body._id).toBe(created.body._id);
+    await request(app.getHttpServer())
+      .get(`/api/warranties/${created.body._id}/pdf`)
+      .set('Cookie', cookie)
+      .expect(200)
+      .expect('Content-Type', /pdf/);
   });
   const product = async (stock = 10) =>
     read(
@@ -916,5 +979,48 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       .get('/api/auth/me')
       .set('Cookie', viewerCookie)
       .expect(401);
+  });
+  it('keeps financial dashboard data and financial endpoints private from operators', async () => {
+    await db.models.Role.updateOne(
+      { name: 'operator' },
+      {
+        $set: {
+          permissions: permissions.filter((permission) => permission !== 'financials:read'),
+        },
+      },
+      { upsert: true },
+    );
+    await db.models.User.create({
+      name: 'Operator',
+      email: 'operator@test.local',
+      role: 'operator',
+      passwordHash: await hash('operator-password-123', 10),
+    });
+    const login = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .set(origin)
+      .send({ email: 'operator@test.local', password: 'operator-password-123' })
+      .expect(201);
+    const operatorCookie = (login.headers['set-cookie'] as unknown as string[])[0];
+    expect(login.body.permissions).not.toContain('financials:read');
+    const dashboard = await request(app.getHttpServer())
+      .get('/api/dashboard')
+      .set('Cookie', operatorCookie)
+      .expect(200);
+    expect(dashboard.body).toHaveProperty('productCount');
+    expect(dashboard.body).toHaveProperty('lowStock');
+    for (const privateField of [
+      'stockCostCents', 'salesCents', 'balanceCents', 'receivedCents',
+      'lifetimeSalesCents', 'lifetimeReceivedCents', 'netProfitCents',
+      'expenseCents', 'profitAfterExpenseCents', 'trend',
+    ]) expect(dashboard.body).not.toHaveProperty(privateField);
+    await request(app.getHttpServer())
+      .get('/api/expenses')
+      .set('Cookie', operatorCookie)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/reports?from=2026-01-01&to=2026-01-31')
+      .set('Cookie', operatorCookie)
+      .expect(403);
   });
 });

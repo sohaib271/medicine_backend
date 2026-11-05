@@ -59,7 +59,11 @@ export class CustomersController {
   @Post() @Permit('customers:write') create(@Body() dto: CustomerDto) {
     if (!dto.name.trim())
       throw new BadRequestException('Customer name is required.');
-    return this.customers.create({ ...dto, name: dto.name.trim() });
+    return this.customers.create({
+      ...dto,
+      name: dto.name.trim(),
+      licenseNumber: dto.licenseNumber?.trim() ?? '',
+    });
   }
   @Post(':id/pending-payment') @Permit('orders:write') pendingPayment(
     @Param('id', IdPipe) id: string,
@@ -81,6 +85,7 @@ export class CustomersController {
             name: dto.name.trim(),
             address: dto.address,
             phone: dto.phone,
+            licenseNumber: dto.licenseNumber?.trim() ?? '',
           },
         },
         { new: true, runValidators: true },

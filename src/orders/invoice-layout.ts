@@ -21,10 +21,11 @@ type InvoiceData = Pick<
   | 'grandTotalCents'
   | 'receivedCents'
   | 'remainingCents'
-> & { remarks?: string };
+> & { remarks?: string; customerLicenseNumber?: string };
 interface InvoiceSettings {
   currency: string;
   timezone: string;
+  warranty?: boolean;
 }
 
 /** Coordinate-based layout keeps wrapped rows and totals together across pages. */
@@ -35,13 +36,13 @@ export function renderInvoice(
 ) {
   const invoiceNumber = displayInvoiceNumber(order.invoiceNumber);
   const color = {
-    forest: '#173F35',
-    cream: '#E9EFDE',
-    lime: '#D7EBA5',
-    ink: '#243B34',
-    muted: '#687C70',
-    line: '#E2E8DC',
-    stripe: '#F7F9F3',
+    forest: settings.warranty ? '#000000' : '#173F35',
+    cream: settings.warranty ? '#FFFFFF' : '#E9EFDE',
+    lime: settings.warranty ? '#FFFFFF' : '#D7EBA5',
+    ink: settings.warranty ? '#000000' : '#243B34',
+    muted: settings.warranty ? '#000000' : '#687C70',
+    line: settings.warranty ? '#000000' : '#E2E8DC',
+    stripe: settings.warranty ? '#FFFFFF' : '#F7F9F3',
   };
   const left = 40;
   const width = doc.page.width - left * 2;
@@ -90,6 +91,24 @@ export function renderInvoice(
       .strokeColor(color.line)
       .stroke();
   const header = (continued = false) => {
+    if (settings.warranty) {
+      if (!continued) {
+        const distributorX = left + width - 220;
+        text('HEALTHCARE DISTRIBUTORS', distributorX, 20, 220, 12, true, color.ink);
+        text('St# 1, Opposite sui gas office, Near underpass', distributorX, 35, 220, 6.4);
+        text('Chowk, Gujranwala, Phone : 0306-6665606', distributorX, 44, 220, 6.4);
+        text('Lic # : 09-341-0132-90395D', distributorX, 53, 220, 6.4);
+      } else {
+        text('WARRANTY - CONTINUED', left, 29, 240, 9, true, color.ink);
+      }
+      doc
+        .moveTo(left, 68)
+        .lineTo(left + width, 68)
+        .lineWidth(0.8)
+        .strokeColor(color.ink)
+        .stroke();
+      return;
+    }
     doc.rect(0, 0, doc.page.width, 72).fill(color.forest);
     doc.roundedRect(left, 19, 28, 28, 7).fill(color.lime);
     doc.rect(left + 12, 25, 4, 16).fill(color.forest);
@@ -130,7 +149,13 @@ export function renderInvoice(
   y += 13;
   text(order.customerName, left, y, 245, 10, true);
   let customerY = y + height(order.customerName, 245, 10, true) + 4;
-  for (const detail of [order.customerPhone]) {
+  for (const detail of [
+    order.customerAddress,
+    order.customerPhone,
+    order.customerLicenseNumber
+      ? `License No: ${order.customerLicenseNumber}`
+      : '',
+  ]) {
     if (!detail) continue;
     text(detail, left, customerY, 245, 8, false, color.muted);
     customerY += height(detail, 245, 8) + 3;
@@ -192,7 +217,11 @@ export function renderInvoice(
       color.muted,
     );
     y += 13;
-    doc.roundedRect(left, y, width, 24, 4).fill(color.forest);
+    if (settings.warranty) {
+      doc.rect(left, y, width, 24).fill('#FFFFFF').strokeColor(color.ink).lineWidth(0.6).stroke();
+    } else {
+      doc.roundedRect(left, y, width, 24, 4).fill(color.forest);
+    }
     [
       'Sr',
       'Product',
@@ -212,7 +241,7 @@ export function renderInvoice(
         cols[i] - 10,
         6.5,
         true,
-        '#FFFFFF',
+        settings.warranty ? color.ink : '#FFFFFF',
         i > 3 ? 'right' : 'left',
       ),
     );
@@ -250,7 +279,7 @@ export function renderInvoice(
       ),
     );
     if (y + rowHeight > bottom) nextPage(true);
-    if (index % 2 === 0) doc.rect(left, y, width, rowHeight).fill(color.stripe);
+    if (!settings.warranty && index % 2 === 0) doc.rect(left, y, width, rowHeight).fill(color.stripe);
     values.forEach((value, i) =>
       text(
         value,
@@ -268,15 +297,21 @@ export function renderInvoice(
     rule(y);
   });
   y += 12;
-  const rows = [
-    ['Subtotal', order.subtotalCents],
-    ['Discount', -order.discountCents],
-    ['Total', order.totalCents],
-    ['Previous Balance', order.previousPendingCents],
-    ['Total Amount', order.grandTotalCents],
-    ['Payment Received', order.receivedCents],
-    ['Net Total', order.grandTotalCents - order.receivedCents],
-  ] as const;
+  const rows: Array<[string, number]> = settings.warranty
+    ? [
+        ['Subtotal', order.subtotalCents],
+        ['Discount', -order.discountCents],
+        ['Net Total', order.totalCents],
+      ]
+    : [
+        ['Subtotal', order.subtotalCents],
+        ['Discount', -order.discountCents],
+        ['Total', order.totalCents],
+        ['Previous Balance', order.previousPendingCents],
+        ['Total Amount', order.grandTotalCents],
+        ['Payment Received', order.receivedCents],
+        ['Net Total', order.grandTotalCents - order.receivedCents],
+      ];
   const totalsWidth = 270;
   const totalsX = left + width - totalsWidth;
   const rowHeights = rows.map(([label, value]) =>
@@ -316,16 +351,24 @@ export function renderInvoice(
     color.muted,
   );
   rows.forEach(([label, value], index) => {
-    const grand = label === 'Net Total';
-    doc
-      .rect(totalsX, y, totalsWidth, rowHeights[index])
-      .fill(
-        grand
-          ? color.forest
-          : label === 'Total Amount'
-            ? color.cream
-            : color.stripe,
-      );
+    const grand = label === 'Net Total' && !settings.warranty;
+    if (settings.warranty) {
+      doc
+        .rect(totalsX, y, totalsWidth, rowHeights[index])
+        .lineWidth(0.5)
+        .strokeColor(color.ink)
+        .stroke();
+    } else {
+      doc
+        .rect(totalsX, y, totalsWidth, rowHeights[index])
+        .fill(
+          grand
+            ? color.forest
+            : label === 'Total Amount'
+              ? color.cream
+              : color.stripe,
+        );
+    }
     text(
       label,
       totalsX + 8,
@@ -347,7 +390,35 @@ export function renderInvoice(
     );
     y += rowHeights[index];
   });
+  if (settings.warranty) {
+    if (y > 638) {
+      doc.addPage();
+      header(true);
+    }
+    const boxY = 646;
+    const gap = 6;
+    const boxWidth = (width - gap) / 2;
+    doc.rect(left, boxY, boxWidth, 116).lineWidth(0.8).strokeColor(color.ink).stroke();
+    doc.rect(left + boxWidth + gap, boxY, boxWidth, 116).lineWidth(0.8).strokeColor(color.ink).stroke();
+    text('Warranty Form 2A (See Rule 19 & 30)', left + 6, boxY + 6, 160, 8, true);
+    text('Warranty under section 23(1)(i) of Drug Act, 1976', left + 157, boxY + 7, boxWidth - 163, 5.6, false, color.ink, 'right');
+    text(
+      'I, Ahsan Mumtaz, being a person resident in Pakistan carrying on business at Off, Opposite sui gas office, Gujranwala under the name of M/s HEALTHCARE DISTRIBUTORS do hereby give this warranty that the drugs hereunder described as sold in the bill of sale invoice do not contravene in any way the provisions of section 23 of the Drugs Act 1976.',
+      left + 6, boxY + 24, boxWidth - 12, 6.2,
+    );
+    text('Authorized Signature', left + boxWidth - 105, boxY + 103, 95, 6, false, color.muted, 'center');
+    doc.moveTo(left + boxWidth - 105, boxY + 101).lineTo(left + boxWidth - 10, boxY + 101).strokeColor(color.ink).stroke();
+    const rightX = left + boxWidth + gap;
+    text('Warranty Form 11 for alternative medicines and', rightX + 6, boxY + 6, boxWidth - 12, 7.5, true, color.ink, 'center');
+    text('health products enlistment rules 2014', rightX + 6, boxY + 16, boxWidth - 12, 7.5, true, color.ink, 'center');
+    text('[see rule 10(3) & (5)]', rightX + 6, boxY + 27, boxWidth - 12, 7, true, color.ink, 'center');
+    text(
+      'It is hereby certified and i undertake the above mention finished products of specified batch number supplied by me do not contravene in any way the provisions of the drap act 2012 and rules framed thereunder, the authorized agent (with valid distribution authority letter) shall pass on this warranty to the retailers in the area of jurisdiction.',
+      rightX + 6, boxY + 42, boxWidth - 12, 6.2,
+    );
+  }
   const range = doc.bufferedPageRange();
+  const attribution = 'This software is developed & maintained  by Sohaib Imran. Call or Whatsapp 03060624288 to get yours';
   for (let page = range.start; page < range.start + range.count; page++) {
     doc.switchToPage(page);
     if (page === 0) {
@@ -360,7 +431,10 @@ export function renderInvoice(
         7.5,
       );
     }
-    rule(780);
+    if (page === range.start + range.count - 1) {
+      text(attribution, left, settings.warranty ? 766 : 773, width, 6.5, false, color.muted, 'center');
+    }
+    rule(786);
     text(invoiceNumber, left, 788, 250, 7, false, color.muted);
     text(
       `Page ${page + 1} of ${range.count}`,

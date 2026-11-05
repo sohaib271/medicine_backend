@@ -14,7 +14,7 @@ import { Throttle } from '@nestjs/throttler';
 import { compare } from 'bcryptjs';
 import { Model } from 'mongoose';
 import type { CookieOptions, Response } from 'express';
-import type { User } from '../database/schemas';
+import type { Role, User } from '../database/schemas';
 import { Public } from './auth.guard';
 import type { AuthRequest } from './auth.guard';
 import { LoginDto } from './auth.dto';
@@ -23,6 +23,7 @@ import { LoginDto } from './auth.dto';
 export class AuthController {
   constructor(
     @InjectModel('User') private users: Model<User>,
+    @InjectModel('Role') private roles: Model<Role>,
     private jwt: JwtService,
     private config: ConfigService,
   ) {}
@@ -65,11 +66,13 @@ export class AuthController {
       ...this.cookieOptions(),
       maxAge: 20 * 24 * 60 * 60 * 1000,
     });
+    const role = await this.roles.findOne({ name: user.role }).lean();
     return {
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
+      permissions: role?.permissions ?? [],
     };
   }
   @Get('me') me(@Req() req: AuthRequest) {

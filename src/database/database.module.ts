@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DocumentNumberService } from './document-number.service';
+import { RoleBootstrapService } from './role-bootstrap.service';
 import {
   CustomerSchema,
   CustomerPaymentSchema,
@@ -13,7 +14,7 @@ import {
 
 @Global()
 @Module({
-  providers: [DocumentNumberService],
+  providers: [DocumentNumberService, RoleBootstrapService],
   imports: [
     MongooseModule.forFeature([
       { name: 'User', schema: UserSchema },

@@ -6,13 +6,13 @@ import { Connection } from 'mongoose';
 export class DocumentNumberService {
   constructor(@InjectConnection() private connection: Connection) {}
 
-  async next(kind: 'DC' | 'invoice', collectionName: string): Promise<string> {
+  async next(kind: 'DC' | 'invoice' | 'warranty', collectionName: string): Promise<string> {
     const counterId = kind;
     const counters = this.connection.collection<{ _id: string; value: number }>(
       'document_counters',
     );
     const collection = this.connection.collection(collectionName);
-    const field = kind === 'DC' ? 'challanNumber' : 'invoiceNumber';
+    const field = kind === 'DC' ? 'challanNumber' : kind === 'invoice' ? 'invoiceNumber' : 'warrantyNumber';
     const [highest] = await collection
       .aggregate<{ value: number }>([
         { $match: { [field]: { $regex: '[0-9]+$' } } },

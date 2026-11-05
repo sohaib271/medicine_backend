@@ -1,7 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Permit } from '../auth/auth.guard';
+import type { AuthRequest } from '../auth/auth.guard';
 import type { Customer, Order, Product } from '../database/schemas';
 import { ReportsService } from '../reports/reports.service';
 @Controller('dashboard')
@@ -12,7 +13,8 @@ export class DashboardController {
     @InjectModel('Customer') private customers: Model<Customer>,
     private reports: ReportsService,
   ) {}
-  @Get() @Permit('dashboard:read') async get() {
+  @Get() @Permit('dashboard:read') async get(@Req() req: AuthRequest) {
+    const canViewFinancials = req.user.permissions.includes('financials:read');
     const since = new Date(Date.now() - 30 * 86400000);
     const [
       productCount,
@@ -42,11 +44,11 @@ export class DashboardController {
         ],
       }),
       this.customers.countDocuments({ deletedAt: null }),
-      this.customers.aggregate<{ total: number }>([
+      canViewFinancials ? this.customers.aggregate<{ total: number }>([
         { $match: { deletedAt: null } },
         { $group: { _id: null, total: { $sum: '$balanceCents' } } },
-      ]),
-      this.orders.aggregate<{ total: number; count: number; received: number }>(
+      ]) : Promise.resolve([]),
+      canViewFinancials ? this.orders.aggregate<{ total: number; count: number; received: number }>(
         [
           { $match: { deletedAt: null, createdAt: { $gte: since } } },
           {
@@ -58,7 +60,7 @@ export class DashboardController {
             },
           },
         ],
-      ),
+      ) : Promise.resolve([]),
       this.products
         .find({
           deletedAt: null,
@@ -80,9 +82,13 @@ export class DashboardController {
         .find({ deletedAt: null })
         .sort({ createdAt: -1 })
         .limit(5)
-        .select('-items -statusHistory -requestId')
+        .select(
+          canViewFinancials
+            ? '-items -statusHistory -requestId'
+            : 'invoiceNumber customerId customerName status createdAt updatedAt',
+        )
         .lean(),
-      this.orders.aggregate<{ _id: string; total: number }>([
+      canViewFinancials ? this.orders.aggregate<{ _id: string; total: number }>([
         { $match: { deletedAt: null, createdAt: { $gte: since } } },
         {
           $group: {
@@ -97,12 +103,12 @@ export class DashboardController {
           },
         },
         { $sort: { _id: 1 } },
-      ]),
-      this.products
+      ]) : Promise.resolve([]),
+      canViewFinancials ? this.products
         .find({ deletedAt: null })
         .select('stock quantityPerPacking purchasePriceCents')
-        .lean(),
-      this.orders.aggregate<{
+        .lean() : Promise.resolve([]),
+      canViewFinancials ? this.orders.aggregate<{
         _id: Types.ObjectId;
         packsSold: number;
         unitsSold: number;
@@ -169,25 +175,47 @@ export class DashboardController {
             },
           },
         },
-      ]),
-      this.orders.aggregate<{ total: number }>([
+      ]) : Promise.resolve([]),
+      canViewFinancials ? this.orders.aggregate<{ total: number }>([
         { $match: { deletedAt: null } },
         { $group: { _id: null, total: { $sum: '$receivedCents' } } },
-      ]),
+      ]) : Promise.resolve([]),
     ]);
+    const operational = {
+      productCount,
+      lowStockCount,
+      customerCount,
+      lowStock,
+      recentOrders,
+    };
+    if (!canViewFinancials) return operational;
+    const financialInventoryProducts = inventoryProducts as Array<{
+      _id: Types.ObjectId;
+      stock: number;
+      quantityPerPacking: number;
+      purchasePriceCents: number;
+    }>;
+    const financialLifetimeSales = lifetimeSales as Array<{
+      _id: Types.ObjectId;
+      packsSold: number;
+      unitsSold: number;
+      salesCents: number;
+      recordedCostCents: number;
+      legacyPacks: number;
+    }>;
     const purchasePriceByProduct = new Map(
-      inventoryProducts.map((product) => [
-        (product as unknown as { _id: Types.ObjectId })._id.toString(),
+      financialInventoryProducts.map((product) => [
+        product._id.toString(),
         product.purchasePriceCents,
       ]),
     );
-    const soldPacks = lifetimeSales.reduce((sum, item) => sum + item.packsSold, 0);
-    const soldUnits = lifetimeSales.reduce((sum, item) => sum + item.unitsSold, 0);
-    const lifetimeSalesCents = lifetimeSales.reduce(
+    const soldPacks = financialLifetimeSales.reduce((sum, item) => sum + item.packsSold, 0);
+    const soldUnits = financialLifetimeSales.reduce((sum, item) => sum + item.unitsSold, 0);
+    const lifetimeSalesCents = financialLifetimeSales.reduce(
       (sum, item) => sum + item.salesCents,
       0,
     );
-    const soldCostCents = lifetimeSales.reduce(
+    const soldCostCents = financialLifetimeSales.reduce(
       (sum, item) =>
         sum +
         item.recordedCostCents +
@@ -205,9 +233,7 @@ export class DashboardController {
     const today = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Karachi' });
     const report = await this.reports.summary(monthStart, today);
     return {
-      productCount,
-      lowStockCount,
-      customerCount,
+      ...operational,
       balanceCents: balance[0]?.total ?? 0,
       salesCents: sales[0]?.total ?? 0,
       receivedCents: sales[0]?.received ?? 0,
@@ -216,7 +242,7 @@ export class DashboardController {
       recentOrders,
       trend,
       stockCostCents: Math.round(
-        inventoryProducts.reduce(
+        financialInventoryProducts.reduce(
           (sum, product) =>
             sum +
             (product.stock / (product.quantityPerPacking ?? 1)) *
@@ -229,7 +255,7 @@ export class DashboardController {
       soldPacks,
       soldUnits,
       netProfitCents: lifetimeSalesCents - soldCostCents,
-      profitEstimated: lifetimeSales.some((item) => item.legacyPacks > 0),
+      profitEstimated: financialLifetimeSales.some((item) => item.legacyPacks > 0),
       expenseCents: report.lifetime.expenseCents,
       monthlyExpenseCents: report.period.expenseCents,
       monthlyProfitCents: report.period.profitCents,

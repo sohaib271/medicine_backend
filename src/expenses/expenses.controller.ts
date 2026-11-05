@@ -23,7 +23,7 @@ const dayEnd = (value: string) => new Date(`${value}T23:59:59.999+05:00`);
 export class ExpensesController {
   constructor(@InjectModel('Expense') private expenses: Model<Expense>) {}
 
-  @Get() @Permit('dashboard:read') async list(@Query() query: ExpenseQuery) {
+  @Get() @Permit('financials:read') async list(@Query() query: ExpenseQuery) {
     if (query.from && query.to && query.from > query.to)
       throw new BadRequestException('From date must be before or equal to the to date.');
     const filter = {
@@ -60,7 +60,7 @@ export class ExpensesController {
     };
   }
 
-  @Post() @Permit('orders:write') create(@Body() dto: ExpenseDto) {
+  @Post() @Permit('financials:read') create(@Body() dto: ExpenseDto) {
     if (!dto.category.trim())
       throw new BadRequestException('Expense category is required.');
     return this.expenses.create({
@@ -71,7 +71,7 @@ export class ExpensesController {
     });
   }
 
-  @Delete(':id') @Permit('orders:write') async remove(
+  @Delete(':id') @Permit('financials:read') async remove(
     @Param('id', IdPipe) id: string,
   ) {
     const expense = await this.expenses.findOneAndUpdate(
