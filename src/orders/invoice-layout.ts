@@ -183,7 +183,11 @@ export function renderInvoice(
   text(remarks, left + 266, y, remarksWidth, 8, true, color.ink);
   y +=
     Math.max(height(area, 245, 8), height(remarks, remarksWidth, 8, true)) + 10;
-  const cols = [24, 106, 60, 43, 50, 32, 55, 35, 40, width - 445];
+  const cols = settings.warranty
+    ? [24, 80, 50, 40, 60, 44, 32, 52, 34, 44, width - 460]
+    : [24, 106, 60, 43, 50, 32, 55, 35, 40, width - 445];
+  const numericStart = settings.warranty ? 5 : 4;
+  const tablePadding = settings.warranty ? 4 : 5;
   let position = left;
   const positions = cols.map((columnWidth) => {
     const current = position;
@@ -195,9 +199,11 @@ export function renderInvoice(
       .save()
       .lineWidth(0.5)
       .strokeColor(headerRow ? '#6D8C7F' : color.line);
-    const boundaries = headerRow
+    const boundaries = settings.warranty
       ? positions.slice(1)
-      : [...positions, left + width];
+      : headerRow
+        ? positions.slice(1)
+        : [...positions, left + width];
     for (const x of boundaries) {
       doc
         .moveTo(x, top)
@@ -217,36 +223,38 @@ export function renderInvoice(
       color.muted,
     );
     y += 13;
+    const headerHeight = settings.warranty ? 32 : 24;
     if (settings.warranty) {
-      doc.rect(left, y, width, 24).fill('#FFFFFF').strokeColor(color.ink).lineWidth(0.6).stroke();
+      doc
+        .rect(left, y, width, headerHeight)
+        .lineWidth(0.65)
+        .fillAndStroke('#FFFFFF', color.ink);
     } else {
-      doc.roundedRect(left, y, width, 24, 4).fill(color.forest);
+      doc.roundedRect(left, y, width, headerHeight, 4).fill(color.forest);
     }
-    [
-      'Sr',
-      'Product',
-      'Company',
-      'Type',
-      'Pieces / Pack',
-      'Packs',
-      'Rate / Pack',
-      'Disc %',
-      'Disc Unit',
-      'Net Amount',
-    ].forEach((label, i) =>
+    (settings.warranty
+      ? [
+          'Sr', 'Product', 'Company', 'Type', 'Batch No.',
+          'Pieces / Pack', 'Packs', 'Rate / Pack', 'Disc %',
+          'Disc Unit', 'Net Amount',
+        ]
+      : [
+          'Sr', 'Product', 'Company', 'Type', 'Pieces / Pack',
+          'Packs', 'Rate / Pack', 'Disc %', 'Disc Unit', 'Net Amount',
+        ]).forEach((label, i) =>
       text(
         label,
-        positions[i] + 5,
-        y + 8,
-        cols[i] - 10,
-        6.5,
+        positions[i] + tablePadding,
+        y + (settings.warranty ? 7 : 8),
+        cols[i] - tablePadding * 2,
+        settings.warranty ? 6.2 : 6.5,
         true,
         settings.warranty ? color.ink : '#FFFFFF',
-        i > 3 ? 'right' : 'left',
+        i >= numericStart ? 'right' : 'left',
       ),
     );
-    columnBorders(y, 24, true);
-    y += 24;
+    columnBorders(y, headerHeight, true);
+    y += headerHeight;
   };
   const nextPage = (withTable: boolean) => {
     doc.addPage();
@@ -260,11 +268,15 @@ export function renderInvoice(
     const discountPercent =
       item.discountType === 'percent' ? `${item.discountValue}%` : '-';
     const discountAmount = number(item.unitPriceCents - item.netUnitPriceCents);
-    const values = [
+    const baseValues = [
       String(index + 1).padStart(2, '0'),
       medicine,
       item.company || '-',
       item.type,
+    ];
+    const values = [
+      ...baseValues,
+      ...(settings.warranty ? [item.batchNumber || '-'] : []),
       String(item.quantityPerPacking ?? 1),
       String(item.quantity),
       number(item.unitPriceCents),
@@ -272,29 +284,42 @@ export function renderInvoice(
       discountAmount,
       number(item.totalCents),
     ];
+    const rowFontSize = settings.warranty ? 7 : 8;
     const rowHeight = Math.max(
-      24,
+      settings.warranty ? 28 : 24,
       ...values.map(
-        (value, i) => height(value, cols[i] - 10, 8, i === 1 || i === 9) + 12,
+        (value, i) =>
+          height(
+            value,
+            cols[i] - tablePadding * 2,
+            rowFontSize,
+            i === 1 || i === values.length - 1,
+          ) + (settings.warranty ? 10 : 12),
       ),
     );
     if (y + rowHeight > bottom) nextPage(true);
     if (!settings.warranty && index % 2 === 0) doc.rect(left, y, width, rowHeight).fill(color.stripe);
+    if (settings.warranty)
+      doc
+        .rect(left, y, width, rowHeight)
+        .lineWidth(0.65)
+        .strokeColor(color.ink)
+        .stroke();
     values.forEach((value, i) =>
       text(
         value,
-        positions[i] + 5,
-        y + 6,
-        cols[i] - 10,
-        8,
-        i === 1 || i === 9,
+        positions[i] + tablePadding,
+        y + (settings.warranty ? 5 : 6),
+        cols[i] - tablePadding * 2,
+        rowFontSize,
+        i === 1 || i === values.length - 1,
         i === 0 ? color.muted : color.ink,
-        i > 3 ? 'right' : 'left',
+        i >= numericStart ? 'right' : 'left',
       ),
     );
     columnBorders(y, rowHeight);
     y += rowHeight;
-    rule(y);
+    if (!settings.warranty) rule(y);
   });
   y += 12;
   const rows: Array<[string, number]> = settings.warranty

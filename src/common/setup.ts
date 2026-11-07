@@ -7,7 +7,7 @@ import type { Request, Response, NextFunction } from 'express';
 export function configureApp(app: INestApplication) {
   const config = app.get(ConfigService);
   const localDesktop = process.env.LOCAL_DESKTOP === 'true';
-  const origins = (
+  const configuredOrigins = (
     localDesktop
       ? `http://127.0.0.1:${config.get<number>('PORT', 3000)}`
       : config.get<string>('FRONTEND_URL', 'http://127.0.0.1:5173')
@@ -15,6 +15,25 @@ export function configureApp(app: INestApplication) {
     .split(',')
     .map((value) => value.trim().replace(/\/$/, ''))
     .filter(Boolean);
+  // Browsers and Vite commonly alternate between these equivalent loopback
+  // hostnames. Accept both locally while keeping production origins exact.
+  const origins = [...new Set(configuredOrigins.flatMap((origin) => {
+    if (config.get('NODE_ENV') === 'production') return [origin];
+    try {
+      const url = new URL(origin);
+      if (url.hostname === '127.0.0.1') {
+        url.hostname = 'localhost';
+        return [origin, url.origin];
+      }
+      if (url.hostname === 'localhost') {
+        url.hostname = '127.0.0.1';
+        return [origin, url.origin];
+      }
+    } catch {
+      // Invalid configured origins remain subject to the normal CORS rejection.
+    }
+    return [origin];
+  }))];
   app.setGlobalPrefix('api');
   app.use(
     helmet(

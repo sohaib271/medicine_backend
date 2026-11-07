@@ -7,6 +7,7 @@ const WarrantyItemSchema = new Schema(
     type: { type: String, required: true },
     strength: { type: String, default: '' },
     company: { type: String, default: '' },
+    batchNumber: { type: String, default: '' },
     quantity: { type: Number, required: true, min: 1 },
     quantityPerPacking: { type: Number, required: true, min: 1 },
     unitPriceCents: { type: Number, required: true, min: 0 },

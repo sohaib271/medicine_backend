@@ -61,7 +61,7 @@ describe('Invoice pagination', () => {
     const spy = jest.spyOn(doc, 'text');
     const items = [{
       productId: new Types.ObjectId(), name: 'Panadol', type: 'Tablet',
-      strength: '500 mg', company: 'Sample', quantity: 1,
+      strength: '500 mg', company: 'Sample', batchNumber: 'BATCH-24017', quantity: 1,
       quantityPerPacking: 10, unitPriceCents: 10000,
       discountType: 'percent' as const, discountValue: 0,
       netUnitPriceCents: 10000, totalCents: 10000,
@@ -80,6 +80,8 @@ describe('Invoice pagination', () => {
     expect(text).toContain('HEALTHCARE DISTRIBUTORS');
     expect(text).toContain('Lic # : 09-341-0132-90395D');
     expect(text).toContain('License No: LIC-12345');
+    expect(text).toContain('Batch No.');
+    expect(text).toContain('BATCH-24017');
     expect(text).toContain('Warranty Form 2A (See Rule 19 & 30)');
     expect(text).toContain('Warranty under section 23(1)(i) of Drug Act, 1976');
     expect(text).toContain('Warranty Form 11 for alternative medicines and');

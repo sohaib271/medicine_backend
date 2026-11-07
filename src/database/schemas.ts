@@ -55,6 +55,7 @@ export const ProductSchema = new Schema(
     type: { type: String, enum: medicineTypes, required: true },
     strength: { type: String, default: '' },
     company: { type: String, default: '' },
+    batchNumber: { type: String, default: '', trim: true },
     purchasePriceCents: { type: Number, required: true, min: 0 },
     salePriceCents: { type: Number, required: true, min: 0 },
     discountType: {
@@ -119,6 +120,7 @@ const ItemSchema = new Schema(
     quantity: { type: Number, required: true },
     quantityPerPacking: { type: Number, required: true, min: 1, default: 1 },
     company: { type: String, default: '' },
+    batchNumber: { type: String, default: '' },
     unitPriceCents: { type: Number, required: true },
     purchasePriceCents: { type: Number, default: null, min: 0 },
     discountType: { type: String, enum: ['percent', 'fixed'], required: true },

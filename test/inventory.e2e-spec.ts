@@ -211,6 +211,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       .expect(201);
     expect(created.body).toMatchObject({
       customerLicenseNumber: 'LIC-12345',
+      items: [{ batchNumber: 'BATCH-24017' }],
       subtotalCents: 20000,
       discountCents: 2500,
       overallDiscountCents: 500,
@@ -246,6 +247,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
           name: 'Panadol',
           type: 'Tablet',
           strength: '500 mg',
+          batchNumber: 'BATCH-24017',
           purchasePrice: 60,
           salePrice: 100,
           discountType: 'percent',

@@ -51,6 +51,7 @@ export class WarrantiesService {
       return {
         productId: product._id, name: product.name, type: product.type,
         strength: product.strength, company: product.company,
+        batchNumber: product.batchNumber,
         quantity: input.quantity, quantityPerPacking: product.quantityPerPacking ?? 1,
         unitPriceCents, discountType: input.discountType,
         discountValue: input.discountValue, netUnitPriceCents,
