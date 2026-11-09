@@ -130,6 +130,7 @@ const ItemSchema = new Schema(
   },
   { _id: false },
 );
+
 const StatusEventSchema = new Schema(
   {
     status: {
@@ -142,6 +143,7 @@ const StatusEventSchema = new Schema(
   },
   { _id: false },
 );
+
 export const OrderSchema = new Schema(
   {
     invoiceNumber: { type: String, required: true, unique: true },
