@@ -160,9 +160,6 @@ export class ProductsService {
       type: dto.type,
       strength: dto.strength.trim(),
       ...(dto.company !== undefined ? { company: dto.company.trim() } : {}),
-      ...(dto.batchNumber !== undefined
-        ? { batchNumber: dto.batchNumber.trim() }
-        : {}),
       purchasePriceCents: cents(dto.purchasePrice),
       salePriceCents,
       discountType: dto.discountType,

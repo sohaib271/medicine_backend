@@ -10,6 +10,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -18,6 +19,8 @@ import {
 
 export class WarrantyItemDto {
   @IsMongoId() productId: string;
+  @IsString() @Matches(/\S/, { message: 'batchNumber must not be empty' }) @MaxLength(80)
+  batchNumber: string;
   @IsInt() @Min(1) @Max(1000000) quantity: number;
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(10000000) salePrice: number;
   @IsIn(['percent', 'fixed']) discountType: 'percent' | 'fixed';

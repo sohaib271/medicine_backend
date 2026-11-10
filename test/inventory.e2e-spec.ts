@@ -199,6 +199,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
         items: [
           {
             productId: p._id,
+            batchNumber: 'BATCH-24017',
             quantity: 2,
             salePrice: 100,
             discountType: 'percent',
@@ -226,7 +227,7 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       .send({
         requestId,
         customerId: customerResponse.body._id,
-        items: [{ productId: p._id, quantity: 1, salePrice: 1, discountType: 'percent', discountValue: 0 }],
+        items: [{ productId: p._id, batchNumber: 'BATCH-24017', quantity: 1, salePrice: 1, discountType: 'percent', discountValue: 0 }],
         overallDiscount: 0,
       })
       .expect(201);
@@ -247,7 +248,6 @@ describe('Medical store API with isolated MongoDB transactions', () => {
           name: 'Panadol',
           type: 'Tablet',
           strength: '500 mg',
-          batchNumber: 'BATCH-24017',
           purchasePrice: 60,
           salePrice: 100,
           discountType: 'percent',
