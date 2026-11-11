@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Post, Body, Query, Res } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, Put, Body, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
@@ -6,7 +6,7 @@ import { Permit } from '../auth/auth.guard';
 import { ListQuery, VersionDto } from '../common/dto';
 import { IdPipe } from '../common/id.pipe';
 import { renderInvoice } from '../orders/invoice-layout';
-import { WarrantyDto } from './warranties.dto';
+import { UpdateWarrantyDto, WarrantyDto } from './warranties.dto';
 import { WarrantiesService } from './warranties.service';
 
 @Controller('warranties')
@@ -44,5 +44,6 @@ export class WarrantiesController {
   }
   @Get(':id') @Permit('orders:read') get(@Param('id', IdPipe) id: string) { return this.warranties.get(id); }
   @Post() @Permit('orders:write') create(@Body() dto: WarrantyDto) { return this.warranties.create(dto); }
+  @Put(':id') @Permit('orders:write') update(@Param('id', IdPipe) id: string, @Body() dto: UpdateWarrantyDto) { return this.warranties.update(id, dto); }
   @Delete(':id') @Permit('orders:write') remove(@Param('id', IdPipe) id: string, @Body() dto: VersionDto) { return this.warranties.remove(id, dto.version); }
 }

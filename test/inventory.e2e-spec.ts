@@ -232,6 +232,47 @@ describe('Medical store API with isolated MongoDB transactions', () => {
       })
       .expect(201);
     expect(retry.body._id).toBe(created.body._id);
+    const updated = await request(app.getHttpServer())
+      .put(`/api/warranties/${created.body._id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({
+        version: created.body.version,
+        customerId: customerResponse.body._id,
+        items: [{
+          productId: p._id,
+          batchNumber: 'BATCH-UPDATED',
+          quantity: 3,
+          salePrice: 120,
+          discountType: 'percent',
+          discountValue: 0,
+        }],
+        overallDiscount: 10,
+        remarks: 'Updated warranty',
+      })
+      .expect(200);
+    expect(updated.body).toMatchObject({
+      _id: created.body._id,
+      warrantyNumber: created.body.warrantyNumber,
+      version: created.body.version + 1,
+      items: [{ batchNumber: 'BATCH-UPDATED', quantity: 3 }],
+      subtotalCents: 36000,
+      overallDiscountCents: 1000,
+      totalCents: 35000,
+      remarks: 'Updated warranty',
+    });
+    expect(await stock()).toBe(10);
+    await request(app.getHttpServer())
+      .put(`/api/warranties/${created.body._id}`)
+      .set(origin)
+      .set('Cookie', cookie)
+      .send({
+        version: created.body.version,
+        customerId: customerResponse.body._id,
+        items: [{ productId: p._id, batchNumber: 'STALE', quantity: 1, salePrice: 1, discountType: 'percent', discountValue: 0 }],
+        overallDiscount: 0,
+      })
+      .expect(404);
     await request(app.getHttpServer())
       .get(`/api/warranties/${created.body._id}/pdf`)
       .set('Cookie', cookie)
