@@ -5,7 +5,7 @@ import type { Customer, Product } from '../database/schemas';
 import { ListQuery, pageResult, searchRegex } from '../common/dto';
 import { cents, discountedPrice } from '../common/money';
 import { DocumentNumberService } from '../database/document-number.service';
-import { WarrantyDto } from './warranties.dto';
+import { UpdateWarrantyDto, WarrantyDetailsDto, WarrantyDto } from './warranties.dto';
 import type { Warranty } from './warranties.schema';
 
 @Injectable()
@@ -39,6 +39,24 @@ export class WarrantiesService {
   async create(dto: WarrantyDto) {
     const existing = await this.warranties.findOne({ requestId: dto.requestId }).lean();
     if (existing) return existing;
+    const values = await this.values(dto);
+    return this.warranties.create({
+      warrantyNumber: await this.numbers.next('warranty', this.warranties.collection.collectionName),
+      requestId: dto.requestId,
+      ...values,
+    });
+  }
+  async update(id: string, dto: UpdateWarrantyDto) {
+    const values = await this.values(dto);
+    const result = await this.warranties.findOneAndUpdate(
+      { _id: id, version: dto.version, deletedAt: null },
+      { $set: values, $inc: { version: 1 } },
+      { new: true, runValidators: true },
+    ).lean();
+    if (!result) throw new NotFoundException('Warranty changed or no longer exists.');
+    return result;
+  }
+  private async values(dto: WarrantyDetailsDto) {
     const customer = await this.customers.findOne({ _id: dto.customerId, deletedAt: null }).lean();
     if (!customer) throw new NotFoundException('Customer not found.');
     const products = await this.products.find({ _id: { $in: dto.items.map((item) => item.productId) }, deletedAt: null }).lean();
@@ -64,15 +82,14 @@ export class WarrantiesService {
     if (overallDiscountCents > beforeOverall)
       throw new BadRequestException('Overall discount cannot exceed the warranty amount.');
     const totalCents = beforeOverall - overallDiscountCents;
-    return this.warranties.create({
-      warrantyNumber: await this.numbers.next('warranty', this.warranties.collection.collectionName),
-      requestId: dto.requestId, customerId: customer._id,
+    return {
+      customerId: customer._id,
       customerName: customer.name, customerAddress: customer.address,
       customerPhone: customer.phone, customerLicenseNumber: customer.licenseNumber ?? '',
       items, subtotalCents, overallDiscountCents,
       discountCents: subtotalCents - totalCents, totalCents,
       remarks: dto.remarks.trim(),
-    });
+    };
   }
   async remove(id: string, version: number) {
     const result = await this.warranties.findOneAndUpdate(

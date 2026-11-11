@@ -26,8 +26,7 @@ export class WarrantyItemDto {
   @IsIn(['percent', 'fixed']) discountType: 'percent' | 'fixed';
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(10000000) discountValue: number;
 }
-export class WarrantyDto {
-  @IsUUID() requestId: string;
+export class WarrantyDetailsDto {
   @IsMongoId() customerId: string;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100)
   @ValidateNested({ each: true }) @Type(() => WarrantyItemDto)
@@ -35,4 +34,12 @@ export class WarrantyDto {
   @IsNumber({ maxDecimalPlaces: 2 }) @Min(0) @Max(10000000000000)
   overallDiscount: number;
   @IsOptional() @IsString() @MaxLength(500) remarks = '';
+}
+
+export class WarrantyDto extends WarrantyDetailsDto {
+  @IsUUID() requestId: string;
+}
+
+export class UpdateWarrantyDto extends WarrantyDetailsDto {
+  @IsInt() @Min(0) version: number;
 }
