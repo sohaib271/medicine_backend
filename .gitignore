@@ -1,11 +1,8 @@
-.env
-.env.*
 node_modules/
 dist/
 coverage/
 *.tsbuildinfo
 *.log
-!.env.example
 .DS_Store
 Thumbs.db
 .data/
