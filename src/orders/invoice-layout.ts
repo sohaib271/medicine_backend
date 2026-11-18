@@ -1,4 +1,5 @@
 import type PDFDocument from 'pdfkit';
+import { resolve } from 'node:path';
 import type { Order } from '../database/schemas';
 import { displayInvoiceNumber } from './invoice-number';
 
@@ -430,6 +431,12 @@ export function renderInvoice(
     text(
       'I, Ahsan Mumtaz, being a person resident in Pakistan carrying on business at Off, Opposite sui gas office, Gujranwala under the name of M/s HEALTHCARE DISTRIBUTORS do hereby give this warranty that the drugs hereunder described as sold in the bill of sale invoice do not contravene in any way the provisions of section 23 of the Drugs Act 1976.',
       left + 6, boxY + 24, boxWidth - 12, 6.2,
+    );
+    doc.image(
+      resolve(__dirname, '../assets/warranty-signature.png'),
+      left + boxWidth - 101,
+      boxY + 65,
+      { width: 86, height: 34 },
     );
     text('Authorized Signature', left + boxWidth - 105, boxY + 103, 95, 6, false, color.muted, 'center');
     doc.moveTo(left + boxWidth - 105, boxY + 101).lineTo(left + boxWidth - 10, boxY + 101).strokeColor(color.ink).stroke();

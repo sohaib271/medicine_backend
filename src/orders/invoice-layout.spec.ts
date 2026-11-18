@@ -59,6 +59,7 @@ describe('Invoice pagination', () => {
     const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
     doc.resume();
     const spy = jest.spyOn(doc, 'text');
+    const imageSpy = jest.spyOn(doc, 'image');
     const items = [{
       productId: new Types.ObjectId(), name: 'Panadol', type: 'Tablet',
       strength: '500 mg', company: 'Sample', batchNumber: 'BATCH-24017', quantity: 1,
@@ -91,6 +92,12 @@ describe('Invoice pagination', () => {
     expect(text).not.toContain('Payment Received');
     expect(text).not.toContain('Total Amount');
     expect(text).toContain('Net Total');
+    expect(imageSpy).toHaveBeenCalledWith(
+      expect.stringContaining('warranty-signature.png'),
+      expect.any(Number),
+      expect.any(Number),
+      { width: 86, height: 34 },
+    );
     expect(text).toContain('This software is developed & maintained  by Sohaib Imran. Call or Whatsapp 03060624288 to get yours');
     doc.end();
   });

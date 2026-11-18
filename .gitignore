@@ -1,5 +1,7 @@
 node_modules/
 dist/
+!.env.example
+init
 coverage/
 *.tsbuildinfo
 *.log
