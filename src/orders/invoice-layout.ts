@@ -93,7 +93,7 @@ export function renderInvoice(
       .stroke();
   const header = (continued = false) => {
     if (!continued) {
-      text('Software Developed by Sohaib Imran Phone No : 03060624288', left, 2, width, 8, true);
+      text('Software Developed by\nSohaib Imran\nPhone No : 03060624288', left, 2, width, 8, true);
       const distributorX = left + width - 220;
       text('HEALTHCARE DISTRIBUTORS', distributorX, 20, 220, 12, true);
       text('St# 1, Opposite sui gas office, Near underpass', distributorX, 35, 220, 6.4);
@@ -339,7 +339,7 @@ export function renderInvoice(
     );
     y += rowHeights[index];
   });
-  if (settings.warranty) {
+  {
     if (y > 638) {
       doc.addPage();
       header(true);
@@ -373,7 +373,6 @@ export function renderInvoice(
     );
   }
   const range = doc.bufferedPageRange();
-  const attribution = 'This software is developed & maintained  by Sohaib Imran. Call or Whatsapp 03060624288 to get yours';
   for (let page = range.start; page < range.start + range.count; page++) {
     doc.switchToPage(page);
     if (page === 0) {
@@ -385,9 +384,6 @@ export function renderInvoice(
         width - 332,
         7.5,
       );
-    }
-    if (page === range.start + range.count - 1) {
-      text(attribution, left, settings.warranty ? 766 : 773, width, 6.5, false, color.muted, 'center');
     }
     rule(786);
     text(invoiceNumber, left, 788, 250, 7, false, color.muted);
