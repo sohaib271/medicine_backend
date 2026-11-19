@@ -37,13 +37,13 @@ export function renderInvoice(
 ) {
   const invoiceNumber = displayInvoiceNumber(order.invoiceNumber);
   const color = {
-    forest: settings.warranty ? '#000000' : '#173F35',
-    cream: settings.warranty ? '#FFFFFF' : '#E9EFDE',
-    lime: settings.warranty ? '#FFFFFF' : '#D7EBA5',
-    ink: settings.warranty ? '#000000' : '#243B34',
-    muted: settings.warranty ? '#000000' : '#687C70',
-    line: settings.warranty ? '#000000' : '#E2E8DC',
-    stripe: settings.warranty ? '#FFFFFF' : '#F7F9F3',
+    forest: '#000000',
+    cream: '#FFFFFF',
+    lime: '#FFFFFF',
+    ink: '#000000',
+    muted: '#000000',
+    line: '#000000',
+    stripe: '#FFFFFF',
   };
   const left = 40;
   const width = doc.page.width - left * 2;
@@ -92,57 +92,17 @@ export function renderInvoice(
       .strokeColor(color.line)
       .stroke();
   const header = (continued = false) => {
-    text('Software Developed by Sohaib Imran Phone No : 03060624288', left, 5, 340, 8.5, true, settings.warranty ? color.ink : '#FFFFFF');
-    if (settings.warranty) {
-      if (!continued) {
-        const distributorX = left + width - 220;
-        text('HEALTHCARE DISTRIBUTORS', distributorX, 20, 220, 12, true, color.ink);
-        text('St# 1, Opposite sui gas office, Near underpass', distributorX, 35, 220, 6.4);
-        text('Chowk, Gujranwala, Phone : 0306-6665606', distributorX, 44, 220, 6.4);
-        text('Lic # : 09-341-0132-90395D', distributorX, 53, 220, 6.4);
-      } else {
-        text('WARRANTY - CONTINUED', left, 29, 240, 9, true, color.ink);
-      }
-      doc
-        .moveTo(left, 68)
-        .lineTo(left + width, 68)
-        .lineWidth(0.8)
-        .strokeColor(color.ink)
-        .stroke();
-      return;
-    }
-    doc.rect(0, 0, doc.page.width, 72).fill(color.forest);
-    doc.roundedRect(left, 19, 28, 28, 7).fill(color.lime);
-    doc.rect(left + 12, 25, 4, 16).fill(color.forest);
-    doc.rect(left + 6, 31, 16, 4).fill(color.forest);
-    text('SALES INVOICE', left + 38, 18, 310, 16, true, '#FFFFFF');
-    text(
-      continued ? 'CONTINUED' : 'MEDICINE COMPANY',
-      left + 38,
-      40,
-      310,
-      7,
-      false,
-      color.lime,
-    );
     if (!continued) {
-      const label = order.status.toUpperCase();
-      const badgeX = left + width - 62;
-      doc.roundedRect(badgeX, 24, 62, 18, 9).fill(color.cream);
-      // Center the visible uppercase letters, excluding the font's line spacing.
-      const fontSize = 7;
-      const capHeight = fontSize * 0.718; // Helvetica Bold capital height.
-      doc
-        .font('Helvetica-Bold')
-        .fontSize(fontSize)
-        .fillColor(color.forest)
-        .text(label, badgeX, 24 + 18 / 2 + capHeight / 2, {
-          width: 62,
-          align: 'center',
-          baseline: 'alphabetic',
-          lineGap: 0,
-        });
+      text('Software Developed by Sohaib Imran Phone No : 03060624288', left, 2, width, 8, true);
+      const distributorX = left + width - 220;
+      text('HEALTHCARE DISTRIBUTORS', distributorX, 20, 220, 12, true);
+      text('St# 1, Opposite sui gas office, Near underpass', distributorX, 35, 220, 6.4);
+      text('Chowk, Gujranwala, Phone : 0306-6665606', distributorX, 44, 220, 6.4);
+      text('Lic # : 09-341-0132-90395D', distributorX, 53, 220, 6.4);
+    } else {
+      text(settings.warranty ? 'WARRANTY - CONTINUED' : 'INVOICE - CONTINUED', left, 29, 240, 9, true);
     }
+    doc.moveTo(left, 68).lineTo(left + width, 68).lineWidth(0.8).strokeColor(color.ink).stroke();
   };
   header();
   let y = 85;
@@ -200,11 +160,7 @@ export function renderInvoice(
       .save()
       .lineWidth(0.5)
       .strokeColor(headerRow ? '#6D8C7F' : color.line);
-    const boundaries = settings.warranty
-      ? positions.slice(1)
-      : headerRow
-        ? positions.slice(1)
-        : [...positions, left + width];
+    const boundaries = [...positions.slice(1), left + width];
     for (const x of boundaries) {
       doc
         .moveTo(x, top)
@@ -357,23 +313,11 @@ export function renderInvoice(
   );
   rows.forEach(([label, value], index) => {
     const grand = label === 'Net Total' && !settings.warranty;
-    if (settings.warranty) {
-      doc
-        .rect(totalsX, y, totalsWidth, rowHeights[index])
-        .lineWidth(0.5)
-        .strokeColor(color.ink)
-        .stroke();
-    } else {
-      doc
-        .rect(totalsX, y, totalsWidth, rowHeights[index])
-        .fill(
-          grand
-            ? color.forest
-            : label === 'Total Amount'
-              ? color.cream
-              : color.stripe,
-        );
-    }
+    doc
+      .rect(totalsX, y, totalsWidth, rowHeights[index])
+      .lineWidth(0.5)
+      .strokeColor(color.ink)
+      .stroke();
     text(
       label,
       totalsX + 8,
