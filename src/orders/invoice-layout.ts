@@ -92,6 +92,7 @@ export function renderInvoice(
       .strokeColor(color.line)
       .stroke();
   const header = (continued = false) => {
+    text('Software Developed by Sohaib Imran Phone No : 03060624288', left, 5, 340, 8.5, true, settings.warranty ? color.ink : '#FFFFFF');
     if (settings.warranty) {
       if (!continued) {
         const distributorX = left + width - 220;
@@ -184,11 +185,10 @@ export function renderInvoice(
   text(remarks, left + 266, y, remarksWidth, 8, true, color.ink);
   y +=
     Math.max(height(area, 245, 8), height(remarks, remarksWidth, 8, true)) + 10;
-  const cols = settings.warranty
-    ? [24, 80, 50, 40, 60, 44, 32, 52, 34, 44, width - 460]
-    : [24, 106, 60, 43, 50, 32, 55, 35, 40, width - 445];
+  const cols = [24, 80, 50, 40, ...(settings.warranty ? [60] : []), 44, 32, 52, 34, 44];
+  cols.push(width - cols.reduce((sum, value) => sum + value, 0));
   const numericStart = settings.warranty ? 5 : 4;
-  const tablePadding = settings.warranty ? 4 : 5;
+  const tablePadding = 4;
   let position = left;
   const positions = cols.map((columnWidth) => {
     const current = position;
@@ -224,33 +224,21 @@ export function renderInvoice(
       color.muted,
     );
     y += 13;
-    const headerHeight = settings.warranty ? 32 : 24;
-    if (settings.warranty) {
-      doc
-        .rect(left, y, width, headerHeight)
-        .lineWidth(0.65)
-        .fillAndStroke('#FFFFFF', color.ink);
-    } else {
-      doc.roundedRect(left, y, width, headerHeight, 4).fill(color.forest);
-    }
+    const headerHeight = 32;
+    doc.rect(left, y, width, headerHeight).lineWidth(0.65).fillAndStroke('#FFFFFF', color.ink);
     (settings.warranty
       ? [
-          'Sr', 'Product', 'Company', 'Type', 'Batch No.',
-          'Pieces / Pack', 'Packs', 'Rate / Pack', 'Disc %',
-          'Disc Unit', 'Net Amount',
+          'Sr', 'Product', 'Company', 'Type', 'Batch No.', 'Pieces / Pack', 'Packs', 'Rate / Pack', 'Disc %', 'Disc Unit', 'Net Amount',
         ]
-      : [
-          'Sr', 'Product', 'Company', 'Type', 'Pieces / Pack',
-          'Packs', 'Rate / Pack', 'Disc %', 'Disc Unit', 'Net Amount',
-        ]).forEach((label, i) =>
+      : ['Sr', 'Product', 'Company', 'Type', 'Pieces / Pack', 'Packs', 'Rate / Pack', 'Disc %', 'Disc Unit', 'Net Amount']).forEach((label, i) =>
       text(
         label,
         positions[i] + tablePadding,
-        y + (settings.warranty ? 7 : 8),
+        y + 7,
         cols[i] - tablePadding * 2,
-        settings.warranty ? 6.2 : 6.5,
+        6.2,
         true,
-        settings.warranty ? color.ink : '#FFFFFF',
+        color.ink,
         i >= numericStart ? 'right' : 'left',
       ),
     );
@@ -285,32 +273,24 @@ export function renderInvoice(
       discountAmount,
       number(item.totalCents),
     ];
-    const rowFontSize = settings.warranty ? 7 : 8;
+    const rowFontSize = 7;
     const rowHeight = Math.max(
-      settings.warranty ? 28 : 24,
+      28,
       ...values.map(
         (value, i) =>
           height(
-            value,
-            cols[i] - tablePadding * 2,
-            rowFontSize,
+            value, cols[i] - tablePadding * 2, rowFontSize,
             i === 1 || i === values.length - 1,
-          ) + (settings.warranty ? 10 : 12),
+          ) + 10,
       ),
     );
     if (y + rowHeight > bottom) nextPage(true);
-    if (!settings.warranty && index % 2 === 0) doc.rect(left, y, width, rowHeight).fill(color.stripe);
-    if (settings.warranty)
-      doc
-        .rect(left, y, width, rowHeight)
-        .lineWidth(0.65)
-        .strokeColor(color.ink)
-        .stroke();
+    doc.rect(left, y, width, rowHeight).lineWidth(0.65).fillAndStroke('#FFFFFF', color.ink);
     values.forEach((value, i) =>
       text(
         value,
         positions[i] + tablePadding,
-        y + (settings.warranty ? 5 : 6),
+        y + 5,
         cols[i] - tablePadding * 2,
         rowFontSize,
         i === 1 || i === values.length - 1,
@@ -320,7 +300,6 @@ export function renderInvoice(
     );
     columnBorders(y, rowHeight);
     y += rowHeight;
-    if (!settings.warranty) rule(y);
   });
   y += 12;
   const rows: Array<[string, number]> = settings.warranty

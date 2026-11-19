@@ -9,12 +9,16 @@ import type { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { renderInvoice } from './invoice-layout';
 import { displayInvoiceNumber } from './invoice-number';
+import type { Customer } from '../database/schemas';
+import { InjectModel } from '@nestjs/mongoose';
+import type { Model } from 'mongoose';
 
 @Injectable()
 export class InvoiceService {
   constructor(
     private orders: OrdersService,
     private config: ConfigService,
+    @InjectModel('Customer') private customers: Model<Customer>,
   ) {}
   async download(id: string, res: Response) {
     const order = await this.orders.get(id);
@@ -33,7 +37,8 @@ export class InvoiceService {
       doc.once('end', () => resolve(Buffer.concat(chunks)));
       doc.once('error', reject);
     });
-    renderInvoice(doc, order, {
+    const customer = await this.customers.findById(order.customerId).select('licenseNumber').lean();
+    renderInvoice(doc, { ...order, customerLicenseNumber: customer?.licenseNumber ?? '' }, {
       currency: this.config.get<string>('CURRENCY', 'PKR'),
       timezone: this.config.get<string>('TIMEZONE', 'Asia/Karachi'),
     });
